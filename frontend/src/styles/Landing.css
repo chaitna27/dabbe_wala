@@ -1,0 +1,234 @@
+/* frontend/src/styles/Landing.css */
+html {
+  scroll-behavior: smooth;
+}
+.hero-container {
+  height: 100vh;
+  width: 100vw; /* Use vw (viewport width) instead of % */
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; 
+  padding-left: 5%; /* Adjusted for better spacing */
+  margin: 0;
+  overflow: hidden;
+}
+
+.hero-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* Points to the image in your public folder */
+  background-image: url('/hero-bg.jpg'); 
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+
+/* THE GRADIENT OVERLAY: Makes text pop on top of the image */
+.hero-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* Darker on the left where the text sits, fading to clear on the right */
+  background: linear-gradient(
+    to right, 
+    rgba(0,0,0,0.85) 0%, 
+    rgba(0,0,0,0.4) 40%, 
+    transparent 100%
+  ),
+  radial-gradient(circleAtCenter, transparent 0%, rgba(0,0,0,0.4) 100%);
+  z-index: 1;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2; /* Keeps text above the dark overlay */
+  color: white;
+  max-width: 800px;
+}
+
+/* Your bold, original fonts */
+.hero-title {
+  font-size: 72px; 
+  font-weight: 800;
+  line-height: 1.1;
+  margin-top: 20px;
+  color: #ffffff;
+  text-shadow: 2px 4px 20px rgba(0,0,0,0.4); 
+}
+
+.hero-subtitle {
+  font-size: 26px;
+  color: rgba(255, 255, 255, 0.9);
+  margin-top: 15px;
+  max-width: 550px;
+  line-height: 1.4;
+}
+
+.main-button {
+  margin-top: 35px;
+  padding: 18px 36px;
+  background: #d35321; /* Your orange brand color */
+  color: white;
+  border: none;
+  border-radius: 50px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.main-button:hover {
+  transform: scale(1.05);
+}
+
+/* Container for the Find Meals section */
+#find-meals {
+  padding: 100px 8%;
+  background: #fcfaf8 !important; /* Premium off-white instead of semi-transparent */
+}
+
+/* Forces exactly 3 cards per row */
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); 
+  gap: 40px;
+  width: 100%;
+  align-items: stretch;
+}
+
+/* Premium Card Styling - Keeping your "animated" naming */
+.provider-card-animated {
+  background: #ffffff;
+  padding: 40px 30px; 
+  border-radius: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03); 
+  transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.provider-card-animated:hover {
+  transform: translateY(-15px); 
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.1); 
+  border-color: rgba(255, 109, 51, 0.3);
+}
+
+.call-btn-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 1.5px solid #eee;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.call-btn-circle:hover {
+  background: #1a3c34; /* Changes to theme green on hover */
+  border-color: #1a3c34;
+  color: white !important; /* Makes the phone icon white */
+  transform: rotate(15deg) scale(1.1);
+}
+
+/* Responsive fix: if screen is too small, it drops to 1 or 2 cards */
+@media (max-width: 1024px) {
+  .provider-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .provider-grid { grid-template-columns: 1fr; }
+}
+
+@keyframes pulse-orange {
+  0% { box-shadow: 0 0 0 0 rgba(255, 109, 51, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 109, 51, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 109, 51, 0); }
+}
+
+.recommended-badge {
+  display: none !important;
+}
+
+/*how it works section*/
+
+/* --- HOW IT WORKS SECTION --- */
+.how-it-works-section {
+  padding: 120px 8%;
+  text-align: center;
+  /* This ensures it clears the hero image correctly */
+  clear: both; 
+  background: transparent;
+}
+
+.how-it-works-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  color: #1a3c34;
+  margin-bottom: 70px;
+  font-weight: 800;
+}
+
+/* THE FIX: This forces 3 columns in one row */
+.steps-container-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); 
+  gap: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.step-box {
+  background: #ffffff;
+  padding: 50px 30px;
+  border-radius: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.step-box:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+}
+
+.step-icon-bg {
+  width: 90px;
+  height: 90px;
+  background: #fcfaf8;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 30px;
+  font-size: 40px;
+}
+
+.step-box-title {
+  font-size: 22px;
+  color: #1a3c34;
+  margin-bottom: 15px;
+  font-weight: 700;
+}
+
+.step-box-text {
+  color: #555;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* Responsiveness: Only stack on mobile phones */
+@media (max-width: 800px) {
+  .steps-container-grid {
+    grid-template-columns: 1fr;
+  }
+}

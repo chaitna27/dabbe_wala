@@ -1,0 +1,122 @@
+:root {
+  /* Brand Colors - Warm & Appetizing */
+  --primary-orange: #ff6b35; 
+  --deep-green: #1a535c;
+  --soft-beige: #f7fff7;
+  
+  /* Neutral Colors */
+  --text-dark: #2d3436;
+  --text-light: #636e72;
+  --white: #ffffff;
+  
+  /* Shadows & Rounds */
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --border-radius: 12px;
+}
+
+.navbar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 5%;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px); /* This creates the glass effect */
+  border-bottom: 1px solid #eee;
+  z-index: 1000;
+}
+
+.provider-card {
+  background: var(--white);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  transition: transform 0.3s ease;
+  overflow: hidden;
+}
+
+.provider-card:hover {
+  transform: translateY(-5px); /* Lift effect */
+}
+
+
+/* ===== Layout ===== */
+.container {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+/* ===== Cards ===== */
+.card {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ===== Card header ===== */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+/* ===== Status badges ===== */
+.badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+.badge.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.badge.accepted {
+  background: #d4edda;
+  color: #155724;
+}
+
+.badge.rejected {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.badge.delivered {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn.accept {
+  background: #28a745;
+  color: white;
+}
+
+.btn.reject {
+  background: #dc3545;
+  color: white;
+}
+
+.btn.deliver {
+  background: #007bff;
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

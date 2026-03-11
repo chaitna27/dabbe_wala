@@ -1,0 +1,221 @@
+/* ============================= */
+/* PAGE BACKGROUND + LAYOUT */
+/* ============================= */
+
+.orders-container {
+  background: #f6efe7;           /* same beige as Find Meals */
+  min-height: 100vh;
+  padding: 60px 60px 60px;      /* space below fixed navbar */
+}
+
+/* ============================= */
+/* TITLE */
+/* ============================= */
+
+.orders-title {
+  font-size: 32px;
+  font-weight: 600;
+  margin-bottom: 40px;
+  color: #1e1e1e;
+}
+
+/* ============================= */
+/* GRID */
+/* ============================= */
+
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 28px;
+}
+
+/* ============================= */
+/* CARD */
+/* ============================= */
+
+.order-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 26px;
+  position: relative;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  transition: all 0.25s ease;
+}
+
+.order-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================= */
+/* ORDER ID */
+/* ============================= */
+
+.order-id {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  font-size: 13px;
+  color: #999;
+  font-weight: 500;
+}
+
+/* ============================= */
+/* TEXT */
+/* ============================= */
+
+.order-items {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.order-meta {
+  color: #666;
+  margin-bottom: 6px;
+  font-size: 15px;
+}
+
+.order-date {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 18px;
+}
+
+/* ============================= */
+/* STATUS + ACTION ROW */
+/* ============================= */
+
+.status-action-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;              /* space between pending & cancel */
+  flex-wrap: wrap;
+}
+
+/* ============================= */
+/* STATUS BADGE */
+/* ============================= */
+
+.status-badge {
+  padding: 7px 16px;
+  border-radius: 30px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+  display: inline-block;
+}
+
+/* STATUS COLORS */
+
+.status-badge.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.accepted {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.delivered {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.cancelled {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* ============================= */
+/* CANCEL BUTTON */
+/* ============================= */
+
+.cancel-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background: #c0392b;
+}
+
+/* ============================= */
+/* REVIEW SECTION */
+/* ============================= */
+
+.review-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.stars-row {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.star {
+  font-size: 24px;
+  cursor: pointer;
+  color: #ccc;
+  transition: 0.2s;
+}
+
+.star.active {
+  color: #f5b301;
+}
+
+.review-input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.submit-review-btn {
+  margin-top: 10px;
+  background: #c05a2b;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.submit-review-btn:hover {
+  background: #a34c23;
+}
+
+/* ============================= */
+/* REVIEWED TEXT (INLINE ON DESKTOP) */
+/* ============================= */
+
+.reviewed-text {
+  color: #2e7d32;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* On laptop — keep delivered + reviewed in same row */
+@media (min-width: 992px) {
+  .delivered-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+}
+
+
+

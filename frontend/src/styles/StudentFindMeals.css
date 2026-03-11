@@ -1,0 +1,386 @@
+.find-meals-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 60px 20px 40px; /* ← important */
+}
+
+/* ================= GRID ================= */
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 25px;
+  margin-top: 20px;
+}
+
+/* ================= CARD ================= */
+
+.menu-card {
+  background: white;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  transition: 0.3s ease;
+}
+
+.menu-card:hover {
+  transform: translateY(-6px);
+}
+
+/* ================= IMAGE ================= */
+
+.card-image-wrapper {
+  position: relative;
+}
+
+.menu-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+/* ================= BADGE ================= */
+
+.diet-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+}
+
+.diet-badge.veg {
+  background: #2e7d32;
+}
+
+.diet-badge.non-veg {
+  background: #c62828;
+}
+
+/* ================= CONTENT ================= */
+
+.card-content {
+  padding: 18px;
+}
+
+.menu-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #1f3d36;
+}
+
+.menu-meta {
+  font-size: 14px;
+  color: #777;
+  margin-bottom: 14px;
+}
+
+/* ================= FOOTER ================= */
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.menu-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #c05a2b;
+}
+
+.order-btn {
+  background: #c05a2b;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.order-btn:hover {
+  background: #a94c24;
+}
+
+/* ================= PROVIDER HERO CARD ================= */
+.provider-hero-card {
+  background: linear-gradient(135deg, #fff7f1, #ffffff);
+  padding: 28px 32px;
+  border-radius: 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 30px 0 40px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.06);
+  border: 1px solid #f1e5de;
+}
+
+.provider-hero-name {
+  margin: 0;
+  font-size: 28px;
+  color: #1f3d36;
+  font-weight: 700;
+}
+
+.provider-hero-location {
+  margin: 8px 0 6px;
+  font-size: 15px;
+  color: #777;
+}
+
+.provider-rating-badge {
+  display: inline-block;
+  margin-top: 8px;
+  background: #fff3e6;
+  color: #c05a2b;
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.provider-hero-actions {
+  display: flex;
+  gap: 14px;
+}
+
+
+/* ================= HERO CARD UPDATED ================= */
+
+.provider-hero-card {
+  background: #f6efe9;
+  padding: 24px 30px;
+  border-radius: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin: 20px 0 30px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+  gap: 40px;
+}
+
+.provider-hero-left {
+  flex: 1;
+}
+
+.provider-location-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.mini-icon-btn {
+  border: none;
+  background: white;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: 0.2s ease;
+}
+
+.mini-icon-btn:hover {
+  transform: scale(1.08);
+}
+
+.delivery-box {
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.delivery-box label {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #1f3d36;
+}
+
+.delivery-input {
+  resize: none;
+  height: 80px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+  background: white;
+}
+
+.save-address-btn {
+  margin-top: 8px;
+  background: #c05a2b;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s ease;
+  font-size: 14px;
+}
+
+.save-address-btn:hover {
+  background: #a94c24;
+}
+.subscribe-btn {
+  margin-top: 14px;
+  background: #1f3d36; /* deep green to match theme */
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: 0.2s ease;
+}
+
+.subscribe-btn:hover {
+  background: #163028;
+}
+.provider-hero-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.provider-location-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.subscribe-btn {
+  width: fit-content;
+  background: #1f3d36;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.2s ease;
+}
+
+.subscribe-btn:hover {
+  background: #163028;
+}
+
+
+.provider-hero-card {
+  margin-top: 30px;
+  background: #efe7de;
+  border-radius: 20px;
+  padding: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 40px;
+}
+
+.provider-hero-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.provider-hero-name {
+  font-size: 28px;
+  color: #1f3d36;
+  margin: 0;
+}
+
+.provider-location-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mini-icon-btn {
+  border: none;
+  background: white;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+}
+
+.subscribe-btn {
+  width: fit-content;
+  background: #1f3d36;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.subscribe-btn:hover {
+  background: #163028;
+}
+
+.delivery-box {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.delivery-input {
+  height: 100px;
+  border-radius: 14px;
+  padding: 12px;
+  border: 1px solid #ccc;
+  resize: none;
+}
+
+.save-address-btn {
+  background: #c05a2b;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.rating-subscribe-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;        /* 👈 adds space between rating & subscribe */
+  margin-top: 12px; /* optional: little spacing from location */
+}
+.rating-badge {
+  background: #fff3e6;
+  color: #c05a2b;
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.price-filter {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  color: #1f3d36;
+}
+
+.price-filter input[type="range"] {
+  width: 180px;
+  accent-color: #c05a2b;
+  cursor: pointer;
+}
