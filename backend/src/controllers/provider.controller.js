@@ -1,114 +1,136 @@
-const db = require("../config/db");
+const Provider = require("../models/Provider");
+const Order = require("../models/Order");
+const Review = require("../models/Review");
 
-/**
- * PUBLIC – for students (landing page & find meals)
- */
-exports.getPublicProviders = (req, res) => {
-  const sql = `
-    SELECT 
-      p.id,
-      p.kitchen_name,
-      p.location,
-      p.phone,
-      p.whatsapp,
-      COALESCE(ROUND(AVG(r.rating), 1), 0) AS rating
-    FROM providers p
-    LEFT JOIN orders o ON o.provider_id = p.id
-    LEFT JOIN reviews r ON r.order_id = o.id
-    WHERE p.is_active = 1
-    GROUP BY p.id
-  `;
+exports.getPublicProviders = async (req, res) => {
+  try {
+    const providers = await Provider.find({ isActive: true }).lean();
 
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("SQL ERROR 👉", err);
-      return res.status(500).json({
-        message: "Failed to fetch providers",
-      });
-    }
+    const results = await Promise.all(
+      providers.map(async (p) => {
+        const orderIds = await Order.find({ provider: p._id }).distinct("_id");
+        let rating = 0;
+        if (orderIds.length > 0) {
+          const agg = await Review.aggregate([
+            { $match: { order: { $in: orderIds } } },
+            { $group: { _id: null, avg: { $avg: "$rating" } } },
+          ]);
+          if (agg[0]?.avg != null) {
+            rating = Math.round(agg[0].avg * 10) / 10;
+          }
+        }
 
-    res.json(results);
-  });
+        return {
+          id: p._id.toString(),
+          userId: p.userId?.toString?.() ?? String(p.userId),
+          kitchenName: p.kitchenName || "",
+          location: p.location || "",
+          phone: p.phone || "",
+          whatsapp: p.whatsapp || "",
+          vegOnly: Boolean(p.vegOnly),
+          isVerified: Boolean(p.isVerified),
+          isActive: Boolean(p.isActive),
+          rating,
+        };
+      }),
+    );
+
+    return res.json(results);
+  } catch (err) {
+    console.error("getPublicProviders:", err);
+    return res.status(500).json({
+      message: "Failed to fetch providers",
+    });
+  }
 };
 
-
-/**
- * PROVIDER DASHBOARD
- */
-exports.getProviderDashboard = (req, res) => {
+exports.getProviderDashboard = async (req, res) => {
   const userId = req.user.id;
 
-  db.query(
-    "SELECT id FROM providers WHERE user_id = ?",
-    [userId],
-    (err, providerResult) => {
-      if (err) return res.status(500).json(err);
+  try {
+    const provider = await Provider.findOne({ userId });
+    if (!provider) {
+      return res.status(404).json({ message: "Provider not found" });
+    }
 
-      if (providerResult.length === 0) {
-        return res.status(404).json({ message: "Provider not found" });
+    const pid = provider._id;
+    const total_orders = await Order.countDocuments({ provider: pid });
+    const delivered_orders = await Order.countDocuments({
+      provider: pid,
+      status: "delivered",
+    });
+
+    const orderIds = await Order.find({ provider: pid }).distinct("_id");
+    let total_reviews = 0;
+    let average_rating = 0;
+
+    if (orderIds.length > 0) {
+      const agg = await Review.aggregate([
+        { $match: { order: { $in: orderIds } } },
+        {
+          $group: {
+            _id: null,
+            total_reviews: { $sum: 1 },
+            average_rating: { $avg: "$rating" },
+          },
+        },
+      ]);
+      if (agg[0]) {
+        total_reviews = agg[0].total_reviews;
+        average_rating = agg[0].average_rating ?? 0;
       }
-
-      const providerId = providerResult[0].id;
-
-      const dashboardSql = `
-        SELECT
-          COUNT(o.id) AS total_orders,
-          SUM(o.status = 'delivered') AS delivered_orders,
-          COUNT(r.id) AS total_reviews,
-          IFNULL(AVG(r.rating), 0) AS average_rating
-        FROM orders o
-        LEFT JOIN reviews r ON o.id = r.order_id
-        WHERE o.provider_id = ?
-      `;
-
-      db.query(dashboardSql, [providerId], (err, data) => {
-        if (err) return res.status(500).json(err);
-        res.json(data[0]);
-      });
     }
-  );
+
+    return res.json({
+      total_orders,
+      delivered_orders,
+      total_reviews,
+      average_rating,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };
 
-
-exports.deactivateProvider = (req, res) => {
+exports.deactivateProvider = async (req, res) => {
   const userId = req.user.id;
 
-  db.query(
-    "UPDATE providers SET is_active = 0 WHERE user_id = ?",
-    [userId],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
+  try {
+    await Provider.findOneAndUpdate(
+      { userId },
+      { isActive: false },
+      { new: true },
+    );
 
-      res.json({ message: "Account deactivated successfully" });
-    }
-  );
+    return res.json({ message: "Account deactivated successfully" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };
 
-exports.reactivateProvider = (req, res) => {
+exports.reactivateProvider = async (req, res) => {
   const userId = req.user.id;
 
-  db.query(
-    "UPDATE providers SET is_active = 1 WHERE user_id = ?",
-    [userId],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: "Account reactivated successfully" });
-    }
-  );
+  try {
+    await Provider.findOneAndUpdate({ userId }, { isActive: true });
+
+    return res.json({ message: "Account reactivated successfully" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };
 
-exports.getProviderProfile = (req, res) => {
+exports.getProviderProfile = async (req, res) => {
   const userId = req.user.id;
 
-  db.query(
-    "SELECT is_active FROM providers WHERE user_id = ?",
-    [userId],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-      if (result.length === 0)
-        return res.status(404).json({ message: "Provider not found" });
-
-      res.json(result[0]);
+  try {
+    const provider = await Provider.findOne({ userId }).select("isActive");
+    if (!provider) {
+      return res.status(404).json({ message: "Provider not found" });
     }
-  );
+
+    return res.json({ isActive: provider.isActive });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };

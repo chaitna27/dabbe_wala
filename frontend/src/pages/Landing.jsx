@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../api";
 import { useNavigate } from "react-router-dom";
 import "./../styles/Landing.css";
+import { dialDigitsForLink } from "../utils/phone";
 
 function Landing() {
     const [providers, setProviders] = useState([]);
@@ -11,7 +12,7 @@ function Landing() {
   const fetchProviders = async () => {
     try {
       const res = await api.get("/providers/public");
-      setProviders(res.data);
+      setProviders(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Failed to load providers", err);
     }
@@ -76,7 +77,7 @@ function Landing() {
                 )}
                 
                 <h3 style={{ color: "var(--deep-green)", fontSize: "22px", marginBottom: "8px" }}>
-                  {provider.kitchen_name}
+                  {provider.kitchenName ?? provider.kitchen_name}
                 </h3>
                 <p style={{ color: "#666", marginBottom: "16px", fontSize: "14px" }}>
                   📍 {provider.location}
@@ -89,15 +90,35 @@ function Landing() {
                     {Number(provider.rating || 0).toFixed(1)}
                   </div>
 
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   {provider.phone && (
                     <button
                       title="Call Provider"
-                      onClick={() => (window.location.href = `tel:+91${provider.phone}`)}
+                      type="button"
+                      onClick={() => {
+                        const d = dialDigitsForLink(provider.phone);
+                        window.location.href = d ? `tel:+${d}` : `tel:${provider.phone}`;
+                      }}
                       className="call-btn-circle"
                     >
                       📞
                     </button>
                   )}
+                  {(provider.whatsapp || provider.phone) && (
+                    <button
+                      type="button"
+                      title="WhatsApp"
+                      onClick={() => {
+                        const raw = provider.whatsapp || provider.phone;
+                        const d = dialDigitsForLink(raw);
+                        if (d) window.open(`https://wa.me/${d}`, "_blank");
+                      }}
+                      className="call-btn-circle"
+                    >
+                      💬
+                    </button>
+                  )}
+                  </div>
                 </div>
 
                 <button

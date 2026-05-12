@@ -2,16 +2,12 @@ import { useEffect, useState } from "react";
 import api from "../api";
 import { Navigate, useNavigate } from "react-router-dom";
 import "../styles/StudentProviders.css";
-
+import { dialDigitsForLink } from "../utils/phone";
 
 export default function StudentProviders() {
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
   const navigate = useNavigate();
-
-  if (!token || role !== "student") {
-    return <Navigate to="/login" />;
-  }
 
   const [providers, setProviders] = useState([]);
 
@@ -22,9 +18,10 @@ export default function StudentProviders() {
   const fetchProviders = async () => {
     try {
       const res = await api.get("/providers/public");
-      setProviders(res.data);
+      setProviders(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       alert("Failed to load providers");
+      setProviders([]);
     }
   };
 
@@ -33,8 +30,22 @@ export default function StudentProviders() {
       alert("Phone number not available");
       return;
     }
-    window.location.href = `tel:+91${phone}`;
+    const digits = dialDigitsForLink(phone);
+    window.location.href = digits ? `tel:+${digits}` : `tel:${phone}`;
   };
+
+  const openWhatsApp = (raw) => {
+    const digits = dialDigitsForLink(raw);
+    if (!digits) {
+      alert("WhatsApp number not available");
+      return;
+    }
+    window.open(`https://wa.me/${digits}`, "_blank");
+  };
+
+  if (!token || role !== "student") {
+    return <Navigate to="/login" />;
+  }
 
   return (
     <div className="container">
@@ -44,7 +55,10 @@ export default function StudentProviders() {
         <p>No providers available</p>
       ) : (
         <div className="provider-grid">
-          {providers.map((p) => (
+          {providers.map((p) => {
+            const name = p.kitchenName ?? p.kitchen_name ?? "Kitchen";
+            const wa = p.whatsapp || p.phone;
+            return (
             <div
               key={p.id}
               style={{
@@ -54,11 +68,15 @@ export default function StudentProviders() {
                 width: "260px",
               }}
             >
-              <h3>{p.kitchen_name}</h3>
-              <p>{p.location}</p>
+              <h3>{name}</h3>
+              <p>{p.location || ""}</p>
+              <p style={{ fontSize: "12px", color: "#666", margin: "4px 0" }}>
+                {p.isActive === false ? "○ Inactive" : "● Active"}
+                {p.vegOnly ? " · Veg only" : ""}
+              </p>
 
               {/* ⭐ Rating / 🆕 New + 📞 Dial */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                {Number(p.rating) > 0 ? (
                  <span>⭐ {Number(p.rating).toFixed(1)}</span>
                ) : (
@@ -92,6 +110,23 @@ export default function StudentProviders() {
                    📞
                 </button>
               )}
+              {wa && (
+                <button
+                  type="button"
+                  title="WhatsApp"
+                  onClick={() => openWhatsApp(wa)}
+                  style={{
+                    border: "1px solid #ccc",
+                    background: "white",
+                    borderRadius: "50%",
+                    width: "32px",
+                    height: "32px",
+                    cursor: "pointer",
+                  }}
+                >
+                  💬
+                </button>
+              )}
             </div>
 
 
@@ -110,7 +145,8 @@ export default function StudentProviders() {
                 View Menu
               </button>
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
     </div>

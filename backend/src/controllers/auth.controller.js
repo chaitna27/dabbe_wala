@@ -1,12 +1,10 @@
-const db = require("../config/db");
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
-const nodemailer = require("nodemailer");
+const User = require("../models/User");
+const Provider = require("../models/Provider");
+const { sendPasswordResetEmail, getEmailCredentials } = require("../config/mail");
 
-/* ======================
-   REGISTER
-====================== */
 exports.register = async (req, res) => {
   const { name, email, password, role } = req.body;
 
@@ -14,186 +12,247 @@ exports.register = async (req, res) => {
     return res.status(400).json({ message: "All fields required" });
   }
 
+  const allowedRoles = ["student", "provider", "admin"];
+  if (!allowedRoles.includes(role)) {
+    return res.status(400).json({ message: "Invalid role" });
+  }
+
   try {
+    const existingUser = await User.findOne({
+      email: String(email).toLowerCase().trim(),
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ message: "Email already exists" });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 1️⃣ Insert user
-    db.query(
-      "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
-      [name, email, hashedPassword, role],
-      (err, userResult) => {
-        if (err) {
-          if (err.code === "ER_DUP_ENTRY") {
-            return res.status(409).json({ message: "Email already exists" });
-          }
-          return res.status(500).json(err);
-        }
+    const user = await User.create({
+      name: name.trim(),
+      email: String(email).toLowerCase().trim(),
+      password: hashedPassword,
+      role,
+    });
 
-        const userId = userResult.insertId;
+    if (role === "provider") {
+      await Provider.create({
+        userId: user._id,
+        kitchenName: `${name.trim()}'s Kitchen`,
+        location: "Near Hostel Road",
+        vegOnly: false,
+        isVerified: true,
+        isActive: true,
+        phone: "",
+        whatsapp: "",
+      });
 
-        // 2️⃣ If PROVIDER → insert into providers table
-        if (role === "provider") {
-          db.query(
-            `INSERT INTO providers (user_id, kitchen_name, location, veg_only, is_verified)
-             VALUES (?, ?, ?, 0, 1)`,
-            [userId, `${name}'s Kitchen`, "Near Hostel Road"],
-            (err) => {
-              if (err) return res.status(500).json(err);
-              res.status(201).json({ message: "Provider registered successfully" });
-            }
-          );
-        } else {
-          // Student
-          res.status(201).json({ message: "Student registered successfully" });
-        }
-      }
-    );
+      return res.status(201).json({
+        message: "Provider registered successfully",
+      });
+    }
+
+    const message =
+      role === "admin"
+        ? "Registered successfully"
+        : "Student registered successfully";
+
+    return res.status(201).json({
+      message,
+    });
   } catch (err) {
-    res.status(500).json(err);
+    if (err.code === 11000) {
+      return res.status(409).json({ message: "Email already exists" });
+    }
+    return res.status(500).json({ message: err.message });
   }
 };
 
-/* ======================
-   LOGIN
-====================== */
-exports.login = (req, res) => {
+exports.login = async (req, res) => {
   const { email, password } = req.body;
 
-  db.query(
-    "SELECT * FROM users WHERE email = ?",
-    [email],
-    async (err, users) => {
-      if (err) return res.status(500).json(err);
-      if (users.length === 0)
-        return res.status(401).json({ message: "Invalid credentials" });
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password required" });
+  }
 
-      const user = users[0];
-      const match = await bcrypt.compare(password, user.password);
+  try {
+    const user = await User.findOne({
+      email: String(email).toLowerCase().trim(),
+    }).select("+password");
 
-      if (!match)
-        return res.status(401).json({ message: "Invalid credentials" });
-      
-      if (!process.env.JWT_SECRET) {
-      console.error("JWT_SECRET is missing");
-      return res.status(500).json({ message: "Server config error" });
-}
-
-      const token = jwt.sign(
-        { id: user.id, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: "7d" }
-      );
-
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          name: user.name,
-          role: user.role,
-        },
-      });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
     }
-  );
+
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ message: "Server misconfiguration" });
+    }
+
+    const token = jwt.sign(
+      { id: user._id.toString(), role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" },
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error("login:", err);
+    return res.status(500).json({
+      message: "Login failed",
+      error: err.message,
+    });
+  }
 };
 
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("name email role address");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    return res.json({
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      address: user.address || "",
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
 
-/* ======================
-   FORGOT PASSWORD (SECURE)
-====================== */
-exports.forgotPassword = (req, res) => {
+exports.patchMe = async (req, res) => {
+  const { address } = req.body;
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (address !== undefined) {
+      user.address = String(address).trim();
+    }
+    await user.save();
+    return res.json({
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      address: user.address || "",
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
-  const crypto = require("crypto");
 
   if (!email) {
     return res.status(400).json({ message: "Email required" });
   }
 
-  const rawToken = crypto.randomBytes(32).toString("hex");
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(rawToken)
-    .digest("hex");
+  const { user: emailUser, pass: emailPass } = getEmailCredentials();
+  if (!emailUser || !emailPass) {
+    return res.status(503).json({
+      message:
+        "Password reset email is not available: set EMAIL_USER and EMAIL_PASS (Gmail app password) on the server.",
+    });
+  }
 
-  const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+  const normalized = String(email).toLowerCase().trim();
 
-  db.query(
-    `
-    UPDATE users
-    SET reset_token = ?, reset_token_expiry = ?
-    WHERE email = ?
-    `,
-    [hashedToken, expiry, email],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Email not found" });
-      }
-
-      const transporter = require("nodemailer").createTransport({
-        service: "gmail",
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      });
-
-      const resetLink = `http://localhost:5173/reset-password/${rawToken}`;
-
-      transporter.sendMail({
-        to: email,
-        subject: "Reset your DabbeWala password",
-        html: `
-          <p>Click below to reset your password:</p>
-          <a href="${resetLink}">${resetLink}</a>
-          <p>This link expires in 15 minutes.</p>
-        `,
-      });
-
-      res.json({ message: "Password reset link sent" });
+  try {
+    const user = await User.findOne({ email: normalized });
+    if (!user) {
+      return res.status(404).json({ message: "Email not found" });
     }
-  );
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+    const expiry = new Date(Date.now() + 15 * 60 * 1000);
+
+    await User.findByIdAndUpdate(user._id, {
+      resetToken: hashedToken,
+      resetTokenExpiry: expiry,
+    });
+
+    const frontendBase = (process.env.FRONTEND_URL || "http://localhost:5173").replace(
+      /\/$/,
+      "",
+    );
+    const resetLink = `${frontendBase}/reset-password/${rawToken}`;
+
+    try {
+      await sendPasswordResetEmail(normalized, resetLink);
+    } catch (mailErr) {
+      console.error("forgotPassword mail:", mailErr);
+      await User.findByIdAndUpdate(user._id, {
+        resetToken: null,
+        resetTokenExpiry: null,
+      });
+      return res.status(502).json({
+        message:
+          mailErr.message ||
+          "Could not send reset email. Check EMAIL_USER / EMAIL_PASS and Gmail app password settings.",
+      });
+    }
+
+    return res.json({ message: "Password reset link sent" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };
 
-/* ======================
-   RESET PASSWORD (SECURE)
-====================== */
 exports.resetPassword = async (req, res) => {
-  const crypto = require("crypto");
-  const bcrypt = require("bcryptjs");
-
-  const { token } = req.params;
+  const token = req.params.token || req.body.token;
   const { password } = req.body;
+
+  if (!token) {
+    return res.status(400).json({ message: "Reset token required" });
+  }
 
   if (!password || password.length < 6) {
     return res.status(400).json({ message: "Password too short" });
   }
 
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(token)
-    .digest("hex");
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  try {
+    const user = await User.findOne({
+      resetToken: hashedToken,
+      resetTokenExpiry: { $gt: new Date() },
+    }).select("+password +resetToken +resetTokenExpiry");
 
-  db.query(
-    `
-    UPDATE users
-    SET password = ?, reset_token = NULL, reset_token_expiry = NULL
-    WHERE reset_token = ?
-      AND reset_token_expiry > NOW()
-    `,
-    [hashedPassword, hashedToken],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-
-      if (result.affectedRows === 0) {
-        return res.status(400).json({
-          message: "Invalid or expired reset link",
-        });
-      }
-
-      res.json({ message: "Password reset successful" });
+    if (!user) {
+      return res.status(400).json({
+        message: "Invalid or expired reset link",
+      });
     }
-  );
+
+    user.password = await bcrypt.hash(password, 10);
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
+    await user.save();
+
+    return res.json({ message: "Password reset successful" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };

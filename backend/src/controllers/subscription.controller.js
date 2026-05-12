@@ -1,78 +1,109 @@
-const db = require("../config/db");
+const mongoose = require("mongoose");
+const Subscription = require("../models/Subscription");
+const Provider = require("../models/Provider");
 
-// =======================
-// CREATE SUBSCRIPTION (STUDENT)
-// =======================
-exports.createSubscription = (req, res) => {
+exports.createSubscription = async (req, res) => {
   const studentId = req.user.id;
-  const { provider_id, plan, start_date, end_date } = req.body;
+  const { plan } = req.body;
+  const providerId = req.body.providerId || req.body.provider_id;
+  const startDateRaw = req.body.startDate ?? req.body.start_date;
+  const endDateRaw = req.body.endDate ?? req.body.end_date;
 
-  const sql = `
-    INSERT INTO subscriptions 
-    (student_id, provider_id, plan, start_date, end_date, status)
-    VALUES (?, ?, ?, ?, ?, 'pending')
-  `;
+  if (!providerId || !mongoose.isValidObjectId(providerId)) {
+    return res.status(400).json({ message: "providerId is required" });
+  }
+  if (!plan || !startDateRaw || !endDateRaw) {
+    return res.status(400).json({ message: "plan, startDate, and endDate are required" });
+  }
 
-  db.query(
-    sql,
-    [studentId, provider_id, plan, start_date, end_date],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: "Subscription created" });
+  try {
+    const exists = await Provider.exists({ _id: providerId });
+    if (!exists) {
+      return res.status(404).json({ message: "Provider not found" });
     }
-  );
+
+    await Subscription.create({
+      student: studentId,
+      provider: providerId,
+      plan: String(plan).trim(),
+      start_date: new Date(startDateRaw),
+      end_date: new Date(endDateRaw),
+      status: "pending",
+    });
+
+    return res.status(201).json({ message: "Subscription created" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };
 
-// =======================
-// STUDENT: VIEW OWN SUBS
-// =======================
-exports.getStudentSubscriptions = (req, res) => {
+exports.getStudentSubscriptions = async (req, res) => {
   const studentId = req.user.id;
 
-  const sql = `
-    SELECT * FROM subscriptions
-    WHERE student_id = ?
-    ORDER BY created_at DESC
-  `;
+  try {
+    const rows = await Subscription.find({ student: studentId })
+      .sort({ createdAt: -1 })
+      .lean();
 
-  db.query(sql, [studentId], (err, rows) => {
-    if (err) return res.status(500).json(err);
-    res.json(rows);
-  });
+    const shaped = rows.map((s) => ({
+      id: s._id.toString(),
+      student_id: s.student.toString(),
+      provider_id: s.provider.toString(),
+      plan: s.plan,
+      start_date: s.start_date,
+      end_date: s.end_date,
+      status: s.status,
+      created_at: s.createdAt,
+      updated_at: s.updatedAt,
+    }));
+
+    return res.json(shaped);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };
 
-// =======================
-// PROVIDER: VIEW REQUESTS
-// =======================
-exports.getProviderSubscriptions = (req, res) => {
+exports.getProviderSubscriptions = async (req, res) => {
   const providerUserId = req.user.id;
 
-  const sql = `
-    SELECT s.*, u.name AS student_name
-    FROM subscriptions s
-    JOIN providers p ON s.provider_id = p.id
-    JOIN users u ON s.student_id = u.id
-    WHERE p.user_id = ?
-    ORDER BY s.created_at DESC
-  `;
+  try {
+    const provider = await Provider.findOne({ userId: providerUserId });
+    if (!provider) {
+      return res.status(403).json({ message: "Not a provider" });
+    }
 
-  db.query(sql, [providerUserId], (err, rows) => {
-    if (err) return res.status(500).json(err);
-    res.json(rows);
-  });
+    const rows = await Subscription.find({ provider: provider._id })
+      .populate("student", "name")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const shaped = rows.map((s) => ({
+      id: s._id.toString(),
+      student_id: s.student._id.toString(),
+      provider_id: s.provider.toString(),
+      student_name: s.student.name,
+      plan: s.plan,
+      start_date: s.start_date,
+      end_date: s.end_date,
+      status: s.status,
+      created_at: s.createdAt,
+      updated_at: s.updatedAt,
+    }));
+
+    return res.json(shaped);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };
 
-// =======================
-// PROVIDER: APPROVE / REJECT
-// =======================
-exports.updateSubscriptionStatus = (req, res) => {
-  console.log("REQ USER:", req.user);
-  console.log("REQ PARAMS:", req.params);
-  console.log("REQ BODY:", req.body);
-
+exports.updateSubscriptionStatus = async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
   let { status } = req.body;
+
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ message: "Invalid subscription id" });
+  }
 
   if (status === "approved" || status === "accepted") {
     status = "active";
@@ -82,43 +113,24 @@ exports.updateSubscriptionStatus = (req, res) => {
     return res.status(400).json({ message: "Invalid status value" });
   }
 
-  db.query(
-    "SELECT id FROM providers WHERE user_id = ?",
-    [userId],
-    (err, providerRows) => {
-      if (err) {
-        console.error("PROVIDER QUERY ERROR:", err);
-        return res.status(500).json(err);
-      } 
-
-      console.log("PROVIDER ROWS:", providerRows);
-
-      if (providerRows.length === 0) {
-        return res.status(403).json({ message: "Not a provider" });
-      }
-
-      const providerId = providerRows[0].id;
-
-      db.query(
-        "UPDATE subscriptions SET status = ? WHERE id = ? AND provider_id = ?",
-        [status, id, providerId],
-        (err2, result) => {
-          if (err2) {
-            console.error("UPDATE ERROR:", err2);
-            return res.status(500).json(err2);
-          }
-
-          console.log("UPDATE RESULT:", result);
-
-          if (result.affectedRows === 0) {
-            return res.status(403).json({ message: "Not authorized" });
-          }
-
-          res.json({ message: "Status updated" });
-        }
-      );
+  try {
+    const provider = await Provider.findOne({ userId });
+    if (!provider) {
+      return res.status(403).json({ message: "Not a provider" });
     }
-  );
+
+    const sub = await Subscription.findOneAndUpdate(
+      { _id: id, provider: provider._id },
+      { status },
+      { new: true }
+    );
+
+    if (!sub) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    return res.json({ message: "Status updated" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };
-
-

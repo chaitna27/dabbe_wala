@@ -171,7 +171,7 @@ export default function ProviderMenu() {
         <ul>
           {menus.map((m) => (
             <li key={m.id} style={{ marginBottom: "10px" }}>
-            <b>{m.day}</b> ({m.meal_type}) –
+            <b>{m.day}</b> ({m.mealType ?? m.meal_type}) –
 
             {editingId === m.id ? (
               <>

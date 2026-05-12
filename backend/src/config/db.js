@@ -1,24 +1,20 @@
-const mysql = require("mysql2");
+const mongoose = require("mongoose");
 require("dotenv").config();
 
-const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
-  ssl: {
-    rejectUnauthorized: false
+const connectDB = async () => {
+  const uri = process.env.MONGO_URI;
+  if (!uri) {
+    console.error("❌ MONGO_URI is not set");
+    process.exit(1);
   }
-});
 
-db.getConnection((err, connection) => {
-  if (err) {
-    console.error("❌ Database connection failed:", err.message);
-  } else {
-    console.log("✅ MySQL connected successfully");
-    connection.release();
+  try {
+    await mongoose.connect(uri);
+    console.log("✅ MongoDB Connected Successfully");
+  } catch (error) {
+    console.error("❌ MongoDB Connection Failed:", error.message);
+    process.exit(1);
   }
-});
+};
 
-module.exports = db;
+module.exports = connectDB;

@@ -1,165 +1,223 @@
-const db = require("../config/db");
+const mongoose = require("mongoose");
+const Menu = require("../models/Menu");
+const Provider = require("../models/Provider");
 
-// ======================
-// GET ALL MENUS (PUBLIC)
-// ======================
-exports.getMenus = (req, res) => {
-  const sql = `
-    SELECT 
-      m.id,
-      m.provider_id,
-      m.items,
-      m.price,
-      m.day,
-      m.meal_type,
-      m.is_veg,
-      m.is_available,
-      m.image,
-      p.kitchen_name,
-      p.location
-    FROM menus m
-    JOIN providers p ON m.provider_id = p.id
-    WHERE m.is_available = 1
-  `;
+const normalize = (v) => (typeof v === "string" ? v.trim().toLowerCase() : v);
 
-  db.query(sql, (err, rows) => {
-    if (err) return res.status(500).json(err);
-    res.json(rows);
-  });
+const menuPublicShape = (m) => ({
+  id: m._id.toString(),
+  providerId: (m.provider?._id || m.provider).toString(),
+  items: m.items ?? "",
+  price: m.price ?? 0,
+  day: m.day,
+  mealType: m.meal_type,
+  isVeg: Boolean(m.is_veg),
+  isAvailable: Boolean(m.is_available),
+  image: m.image || null,
+  kitchenName: m.provider?.kitchenName ?? "",
+  location: m.provider?.location ?? "",
+  createdAt: m.createdAt,
+  updatedAt: m.updatedAt,
+});
+
+exports.getMenus = async (req, res) => {
+  try {
+    const menus = await Menu.find({ is_available: true })
+      .populate("provider", "kitchenName location")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json(menus.map(menuPublicShape));
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };
 
-// ======================
-// CREATE MENU (PROVIDER)
-// ======================
-exports.createMenu = (req, res) => {
+exports.createMenu = async (req, res) => {
   const userId = req.user.id;
-  const { items, price, day, meal_type, is_veg } = req.body;
+  const { items, price, day, meal_type, mealType, is_veg, isVeg } = req.body;
+  const image = req.file?.path || null;
 
-  // 🖼️ NEW: image path
-  const image = req.file ? req.file.path : null;
+  const mealTypeRaw = meal_type ?? mealType;
 
-  if (!items || !price || !day || !meal_type) {
+  if (!items || price === undefined || !day || !mealTypeRaw) {
     return res.status(400).json({ message: "All fields required" });
   }
 
-  db.query(
-    "SELECT id FROM providers WHERE user_id = ?",
-    [userId],
-    (err, rows) => {
-      if (err) return res.status(500).json(err);
-      if (rows.length === 0)
-        return res.status(403).json({ message: "Not a provider" });
-
-      const providerId = rows[0].id;
-
-      db.query(
-        `INSERT INTO menus 
-         (provider_id, items, price, day, meal_type, is_veg, is_available, image)
-         VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
-        [providerId, items, price, day, meal_type, is_veg ?? 1, image],
-        (err) => {
-          if (err) return res.status(500).json(err);
-          res.json({ message: "Menu added successfully" });
-        }
-      );
-    }
-  );
-};
-
-
-// ======================
-// GET PROVIDER MENUS (PROVIDER DASHBOARD)
-// ======================
-exports.getProviderMenus = (req, res) => {
-  const userId = req.user.id;
-
-  db.query(
-    "SELECT id FROM providers WHERE user_id = ?",
-    [userId],
-    (err, rows) => {
-      if (err) return res.status(500).json(err);
-      if (rows.length === 0)
-        return res.status(403).json({ message: "Not a provider" });
-
-      const providerId = rows[0].id;
-
-      db.query(
-        `SELECT *
-        FROM menus
-        WHERE provider_id = ?
-        ORDER BY created_at DESC`,
-        [providerId],
-        (err, menus) => {
-          if (err) return res.status(500).json(err);
-          res.json(menus);
-        }
-      );
-    }
-  );
-};
-
-// ======================
-// UPDATE MENU
-// ======================
-exports.updateMenu = (req, res) => {
-  const { id } = req.params;
-  const { items, price, is_available, is_veg } = req.body;
-
-  const image = req.file ? req.file.path : null;
-
-  let sql = `
-    UPDATE menus 
-    SET items=?, price=?, is_available=?, is_veg=?
-  `;
-
-  const values = [items, price, is_available, is_veg];
-
-  if (image) {
-    sql += ", image=?";
-    values.push(image);
+  const priceNum = Number(price);
+  if (!Number.isFinite(priceNum) || priceNum < 0) {
+    return res.status(400).json({ message: "Invalid price" });
   }
 
-  sql += " WHERE id=?";
-  values.push(id);
+  const vegFlag = is_veg !== undefined ? is_veg : isVeg;
+  const isVegBool = vegFlag === undefined ? true : Boolean(vegFlag);
 
-  db.query(sql, values, (err) => {
-    if (err) return res.status(500).json(err);
-    res.json({ message: "Menu updated" });
-  });
+  try {
+    const provider = await Provider.findOne({ userId });
+    if (!provider) {
+      return res.status(403).json({ message: "Not a provider" });
+    }
+
+    const menu = await Menu.create({
+      provider: provider._id,
+      items: String(items).trim(),
+      price: priceNum,
+      day: normalize(day),
+      meal_type: normalize(mealTypeRaw),
+      is_veg: isVegBool,
+      is_available: true,
+      image,
+    });
+
+    return res.status(201).json({
+      message: "Menu added successfully",
+      id: menu._id.toString(),
+    });
+  } catch (err) {
+    if (err.name === "ValidationError") {
+      return res.status(400).json({ message: err.message });
+    }
+    return res.status(500).json({ message: err.message });
+  }
 };
 
+exports.getProviderMenus = async (req, res) => {
+  const userId = req.user.id;
 
+  try {
+    const provider = await Provider.findOne({ userId });
+    if (!provider) {
+      return res.status(403).json({ message: "Not a provider" });
+    }
 
-// ======================
-// DELETE MENU
-// ======================
-exports.deleteMenu = (req, res) => {
+    const menus = await Menu.find({ provider: provider._id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const shaped = menus.map((m) => ({
+      id: m._id.toString(),
+      providerId: m.provider.toString(),
+      items: m.items,
+      price: m.price,
+      day: m.day,
+      mealType: m.meal_type,
+      isVeg: Boolean(m.is_veg),
+      isAvailable: Boolean(m.is_available),
+      image: m.image,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
+    }));
+
+    return res.json(shaped);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+exports.updateMenu = async (req, res) => {
+  const { id } = req.params;
+  const { items, price, is_available, isAvailable, is_veg, isVeg } = req.body;
+  const image = req.file?.path || null;
+
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ message: "Invalid menu id" });
+  }
+
+  const avail =
+    is_available !== undefined ? is_available : isAvailable;
+  const veg = is_veg !== undefined ? is_veg : isVeg;
+
+  try {
+    const provider = await Provider.findOne({ userId: req.user.id });
+    if (!provider) {
+      return res.status(403).json({ message: "Not a provider" });
+    }
+
+    const menu = await Menu.findOne({ _id: id, provider: provider._id });
+    if (!menu) {
+      return res.status(404).json({ message: "Menu not found" });
+    }
+
+    if (items !== undefined) menu.items = String(items).trim();
+    if (price !== undefined) {
+      const p = Number(price);
+      if (!Number.isFinite(p) || p < 0) {
+        return res.status(400).json({ message: "Invalid price" });
+      }
+      menu.price = p;
+    }
+    if (avail !== undefined) menu.is_available = Boolean(avail);
+    if (veg !== undefined) menu.is_veg = Boolean(veg);
+    if (image) menu.image = image;
+
+    await menu.save();
+
+    return res.json({ message: "Menu updated" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+exports.deleteMenu = async (req, res) => {
   const { id } = req.params;
 
-  db.query("DELETE FROM menus WHERE id=?", [id], (err) => {
-    if (err) return res.status(500).json(err);
-    res.json({ message: "Menu deleted" });
-  });
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ message: "Invalid menu id" });
+  }
+
+  try {
+    const provider = await Provider.findOne({ userId: req.user.id });
+    if (!provider) {
+      return res.status(403).json({ message: "Not a provider" });
+    }
+
+    const result = await Menu.deleteOne({ _id: id, provider: provider._id });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: "Menu not found" });
+    }
+
+    return res.json({ message: "Menu deleted" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };
 
-// ======================
-// GET MENUS BY PROVIDER ID (STUDENT VIEW)
-// ======================
-exports.getMenusByProviderId = (req, res) => {
+exports.getMenusByProviderId = async (req, res) => {
   const { providerId } = req.params;
 
-  db.query(
-    `SELECT *
-     FROM menus
-     WHERE provider_id = ? AND is_available = 1
-     ORDER BY created_at DESC`,
-    [providerId],
-    (err, menus) => {
-      if (err) return res.status(500).json(err);
-      res.json(menus);
+  if (!mongoose.isValidObjectId(providerId)) {
+    return res.status(400).json({ message: "Invalid provider id" });
+  }
+
+  try {
+    const exists = await Provider.exists({ _id: providerId });
+    if (!exists) {
+      return res.status(404).json({ message: "Provider not found" });
     }
-  );
+
+    const menus = await Menu.find({
+      provider: providerId,
+      is_available: true,
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const shaped = menus.map((m) => ({
+      id: m._id.toString(),
+      providerId: m.provider.toString(),
+      items: m.items,
+      price: m.price,
+      day: m.day,
+      mealType: m.meal_type,
+      isVeg: Boolean(m.is_veg),
+      isAvailable: Boolean(m.is_available),
+      image: m.image,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
+    }));
+
+    return res.json(shaped);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };
-
-
-

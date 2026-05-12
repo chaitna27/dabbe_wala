@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://dabbe-wala.onrender.com/api"
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
 });
 
 /* 🔐 Add token automatically */
@@ -17,7 +17,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
+    const url = error.config?.url || "";
+    const skipLogout =
+      url.includes("/auth/login") ||
+      url.includes("/auth/register") ||
+      url.includes("/auth/forgot-password") ||
+      url.includes("/auth/reset-password");
+    if (!skipLogout && error.response && error.response.status === 401) {
       localStorage.removeItem("token");
       localStorage.removeItem("role");
       window.location.href = "/login";

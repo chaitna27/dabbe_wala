@@ -3,8 +3,6 @@ import api from "../api";
 import { Link } from "react-router-dom";
 
 export default function ForgotPassword() {
-    console.log("FORGOT PASSWORD COMPONENT RENDERED");
-
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");

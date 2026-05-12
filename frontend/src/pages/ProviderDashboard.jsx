@@ -47,7 +47,8 @@ export default function ProviderDashboard() {
   const fetchProfile = async () => {
     try {
       const res = await api.get("/providers/profile");
-      setIsActive(res.data.is_active);
+      const active = res.data?.isActive ?? res.data?.is_active;
+      setIsActive(active === true);
     } catch (err) {
       alert("Failed to load profile");
     }
@@ -145,7 +146,9 @@ export default function ProviderDashboard() {
 
 <h3>Account Status</h3>
 
-{isActive === 1 ? (
+{isActive === null ? (
+  <p>Loading account status…</p>
+) : isActive === true ? (
   <>
     <p style={{ color: "green" }}>🟢 Active</p>
     <button
@@ -154,7 +157,7 @@ export default function ProviderDashboard() {
 
         await api.put("/providers/deactivate");
         alert("Account deactivated");
-        setIsActive(0);
+        setIsActive(false);
       }}
       style={{
         background: "red",
@@ -175,7 +178,7 @@ export default function ProviderDashboard() {
       onClick={async () => {
         await api.put("/providers/reactivate");
         alert("Account reactivated");
-        setIsActive(1);
+        setIsActive(true);
       }}
       style={{
         background: "green",

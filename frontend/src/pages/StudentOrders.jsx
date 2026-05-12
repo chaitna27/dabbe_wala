@@ -69,7 +69,7 @@ function StudentOrders() {
 
     try {
       await api.post("/reviews", {
-        order_id: orderId,
+        orderId,
         rating: review.rating,
         comment: review.comment.trim(),
       });
@@ -115,10 +115,10 @@ return (
                 #{order.order_id}
               </div>
 
-              <h3 className="order-items">{order.items}</h3>
+              <h3 className="order-items">{order.items ?? "Meal"}</h3>
 
               <p className="order-meta">
-                ₹{order.price} • {order.provider_name}
+                ₹{order.price ?? "—"} • {order.provider_name ?? "Provider"}
               </p>
 
               <p className="order-date">
@@ -146,7 +146,7 @@ return (
                   </button>
                 )}
 
-               {order.status === "delivered" && order.reviewed === 1 && (
+               {order.status === "delivered" && order.reviewed && (
                  <span className="reviewed-text">
                     ✓ Reviewed
                  </span>
@@ -155,7 +155,7 @@ return (
               </div>
               
               {/* ⭐ REVIEW SECTION */}
-              {order.status === "delivered" && order.reviewed !== 1 && (
+               {order.status === "delivered" && !order.reviewed && (
                 <div className="review-section">
                   <b>Rate this order</b>
 
@@ -203,12 +203,6 @@ return (
                     Submit Review
                   </button>
                 </div>
-              )}
-
-              {order.reviewed === 1 && (
-                <p className="reviewed-text">
-                  ✅ You already reviewed this order
-                </p>
               )}
             </div>
           );

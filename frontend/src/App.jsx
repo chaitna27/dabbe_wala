@@ -99,7 +99,7 @@ function App() {
         />
 
         <Route
-          path="/provider/:id"
+          path="/provider/menu"
           element={
             <ProtectedRoute allowedRoles={["provider"]}>
               <ProviderMenu />
