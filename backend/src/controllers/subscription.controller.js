@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Subscription = require("../models/Subscription");
 const Provider = require("../models/Provider");
+const { ensureProviderForUser } = require("../utils/providerForUser");
 
 exports.createSubscription = async (req, res) => {
   const studentId = req.user.id;
@@ -67,9 +68,9 @@ exports.getProviderSubscriptions = async (req, res) => {
   const providerUserId = req.user.id;
 
   try {
-    const provider = await Provider.findOne({ userId: providerUserId });
+    const provider = await ensureProviderForUser(providerUserId);
     if (!provider) {
-      return res.status(403).json({ message: "Not a provider" });
+      return res.status(404).json({ message: "Provider not found" });
     }
 
     const rows = await Subscription.find({ provider: provider._id })
@@ -114,9 +115,9 @@ exports.updateSubscriptionStatus = async (req, res) => {
   }
 
   try {
-    const provider = await Provider.findOne({ userId });
+    const provider = await ensureProviderForUser(userId);
     if (!provider) {
-      return res.status(403).json({ message: "Not a provider" });
+      return res.status(404).json({ message: "Provider not found" });
     }
 
     const sub = await Subscription.findOneAndUpdate(

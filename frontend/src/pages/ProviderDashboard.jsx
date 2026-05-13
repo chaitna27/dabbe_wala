@@ -1,7 +1,53 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "../api";
 import { Navigate, useNavigate } from "react-router-dom";
 import "../styles/ProviderDashboard.css";
+
+function sanitizeCoordInput(value) {
+  return String(value ?? "")
+    .replace(/[°NSEWnsew]/g, "")
+    .replace(/[^\d.\-]/g, "")
+    .replace(/(?!^)-/g, "");
+}
+
+function countDigits(s) {
+  return (String(s).match(/\d/g) || []).length;
+}
+
+function validateKitchenForm(kitchen) {
+  const errors = {};
+  if (!kitchen.kitchenName.trim()) {
+    errors.kitchenName = "Kitchen name is required.";
+  }
+  if (!kitchen.location.trim()) {
+    errors.location = "Location is required.";
+  }
+  const phone = kitchen.phone.trim();
+  if (phone && countDigits(phone) < 10) {
+    errors.phone = "Enter a valid phone number (at least 10 digits).";
+  }
+  const wa = kitchen.whatsapp.trim();
+  if (wa && countDigits(wa) < 10) {
+    errors.whatsapp = "Enter a valid WhatsApp number (at least 10 digits).";
+  }
+  const latStr = kitchen.latitude.trim();
+  const lngStr = kitchen.longitude.trim();
+  if (latStr || lngStr) {
+    if (latStr) {
+      const la = Number(latStr);
+      if (!Number.isFinite(la) || la < -90 || la > 90) {
+        errors.latitude = "Latitude must be a number between −90 and 90.";
+      }
+    }
+    if (lngStr) {
+      const lo = Number(lngStr);
+      if (!Number.isFinite(lo) || lo < -180 || lo > 180) {
+        errors.longitude = "Longitude must be a number between −180 and 180.";
+      }
+    }
+  }
+  return errors;
+}
 
 export default function ProviderDashboard() {
   const token = localStorage.getItem("token");
@@ -12,6 +58,7 @@ export default function ProviderDashboard() {
   const [loadingReviews, setLoadingReviews] = useState(true);
   const [isActive, setIsActive] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [summaryError, setSummaryError] = useState("");
   const [kitchen, setKitchen] = useState({
     kitchenName: "",
     location: "",
@@ -21,16 +68,29 @@ export default function ProviderDashboard() {
     longitude: "",
   });
   const [savingKitchen, setSavingKitchen] = useState(false);
+  const [profileReady, setProfileReady] = useState(false);
+  const [profileLoadError, setProfileLoadError] = useState("");
+  const [formErrors, setFormErrors] = useState({});
+  const [toast, setToast] = useState(null);
+
+  const loadSummary = useCallback(async () => {
+    try {
+      const res = await api.get("/orders/provider/summary");
+      setSummary(res.data);
+      setSummaryError("");
+    } catch (err) {
+      setSummary(null);
+      setSummaryError(err.response?.data?.message || "Could not load order summary.");
+    }
+  }, []);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await api.get("/orders/provider/summary");
-        setSummary(res.data);
-      } catch {
-        /* optional */
-      }
-    };
+    if (!toast) return undefined;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  useEffect(() => {
     const loadReviews = async () => {
       try {
         const res = await api.get("/reviews/provider");
@@ -42,10 +102,11 @@ export default function ProviderDashboard() {
       }
     };
     const loadProfile = async () => {
+      setProfileLoadError("");
       try {
         const res = await api.get("/providers/profile");
         const d = res.data;
-        setIsActive(d?.isActive === true || d?.is_active === true);
+        setIsActive(d?.isActive === true);
         setKitchen({
           kitchenName: d.kitchenName ?? "",
           location: d.location ?? "",
@@ -54,20 +115,30 @@ export default function ProviderDashboard() {
           latitude: d.latitude != null ? String(d.latitude) : "",
           longitude: d.longitude != null ? String(d.longitude) : "",
         });
-      } catch {
+      } catch (err) {
         setIsActive(null);
+        setProfileLoadError(err.response?.data?.message || "Could not load kitchen profile.");
+      } finally {
+        setProfileReady(true);
       }
     };
-    load();
+    loadSummary();
     loadReviews();
     loadProfile();
-  }, []);
+  }, [loadSummary]);
 
   const saveKitchen = async (e) => {
     e.preventDefault();
+    const errors = validateKitchenForm(kitchen);
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setToast({ type: "error", message: "Please fix the highlighted fields." });
+      return;
+    }
+
     try {
       setSavingKitchen(true);
-      await api.patch("/providers/profile", {
+      await api.put("/providers/profile", {
         kitchenName: kitchen.kitchenName.trim(),
         location: kitchen.location.trim(),
         phone: kitchen.phone.trim(),
@@ -75,9 +146,12 @@ export default function ProviderDashboard() {
         latitude: kitchen.latitude.trim() === "" ? null : Number(kitchen.latitude),
         longitude: kitchen.longitude.trim() === "" ? null : Number(kitchen.longitude),
       });
-      alert("Kitchen details saved");
+      setToast({ type: "success", message: "Kitchen details saved successfully." });
+      setFormErrors({});
+      loadSummary();
     } catch (err) {
-      alert(err.response?.data?.message || "Could not save");
+      const msg = err.response?.data?.message || "Could not save kitchen details.";
+      setToast({ type: "error", message: msg });
     } finally {
       setSavingKitchen(false);
     }
@@ -91,20 +165,37 @@ export default function ProviderDashboard() {
     <div className="pd-page container">
       <h2 className="pd-title">Provider Dashboard</h2>
 
+      {toast ? (
+        <div className={`pd-toast pd-toast-${toast.type}`} role="status">
+          {toast.message}
+        </div>
+      ) : null}
+
       <section className="pd-section">
         <h3 className="pd-section-title">Kitchen &amp; location</h3>
         <p className="pd-muted">
           Students see your kitchen name, address text, and distance when you set coordinates.
         </p>
-        <form className="pd-form" onSubmit={saveKitchen}>
+        {profileLoadError ? (
+          <div className="pd-banner pd-banner-error" role="alert">
+            {profileLoadError}
+          </div>
+        ) : null}
+        <form className="pd-form" onSubmit={saveKitchen} noValidate>
           <div className="pd-grid">
             <label className="pd-field">
               <span>Kitchen name</span>
               <input
                 value={kitchen.kitchenName}
-                onChange={(e) => setKitchen((k) => ({ ...k, kitchenName: e.target.value }))}
+                onChange={(e) =>
+                  setKitchen((k) => ({ ...k, kitchenName: e.target.value }))
+                }
                 maxLength={200}
+                aria-invalid={Boolean(formErrors.kitchenName)}
               />
+              {formErrors.kitchenName ? (
+                <span className="pd-field-error">{formErrors.kitchenName}</span>
+              ) : null}
             </label>
             <label className="pd-field">
               <span>Location (area / landmark)</span>
@@ -112,7 +203,11 @@ export default function ProviderDashboard() {
                 value={kitchen.location}
                 onChange={(e) => setKitchen((k) => ({ ...k, location: e.target.value }))}
                 maxLength={300}
+                aria-invalid={Boolean(formErrors.location)}
               />
+              {formErrors.location ? (
+                <span className="pd-field-error">{formErrors.location}</span>
+              ) : null}
             </label>
             <label className="pd-field">
               <span>Phone</span>
@@ -120,7 +215,10 @@ export default function ProviderDashboard() {
                 value={kitchen.phone}
                 onChange={(e) => setKitchen((k) => ({ ...k, phone: e.target.value }))}
                 maxLength={20}
+                inputMode="tel"
+                aria-invalid={Boolean(formErrors.phone)}
               />
+              {formErrors.phone ? <span className="pd-field-error">{formErrors.phone}</span> : null}
             </label>
             <label className="pd-field">
               <span>WhatsApp</span>
@@ -128,28 +226,51 @@ export default function ProviderDashboard() {
                 value={kitchen.whatsapp}
                 onChange={(e) => setKitchen((k) => ({ ...k, whatsapp: e.target.value }))}
                 maxLength={20}
+                inputMode="tel"
+                aria-invalid={Boolean(formErrors.whatsapp)}
               />
+              {formErrors.whatsapp ? (
+                <span className="pd-field-error">{formErrors.whatsapp}</span>
+              ) : null}
             </label>
             <label className="pd-field">
-              <span>Latitude (optional, −90 to 90)</span>
+              <span>Latitude (optional)</span>
               <input
                 value={kitchen.latitude}
-                onChange={(e) => setKitchen((k) => ({ ...k, latitude: e.target.value }))}
-                placeholder="e.g. 18.5204"
+                onChange={(e) =>
+                  setKitchen((k) => ({
+                    ...k,
+                    latitude: sanitizeCoordInput(e.target.value),
+                  }))
+                }
+                placeholder="21.2487"
                 inputMode="decimal"
+                aria-invalid={Boolean(formErrors.latitude)}
               />
+              {formErrors.latitude ? (
+                <span className="pd-field-error">{formErrors.latitude}</span>
+              ) : null}
             </label>
             <label className="pd-field">
-              <span>Longitude (optional, −180 to 180)</span>
+              <span>Longitude (optional)</span>
               <input
                 value={kitchen.longitude}
-                onChange={(e) => setKitchen((k) => ({ ...k, longitude: e.target.value }))}
-                placeholder="e.g. 73.8567"
+                onChange={(e) =>
+                  setKitchen((k) => ({
+                    ...k,
+                    longitude: sanitizeCoordInput(e.target.value),
+                  }))
+                }
+                placeholder="81.6296"
                 inputMode="decimal"
+                aria-invalid={Boolean(formErrors.longitude)}
               />
+              {formErrors.longitude ? (
+                <span className="pd-field-error">{formErrors.longitude}</span>
+              ) : null}
             </label>
           </div>
-          <button type="submit" className="pd-btn" disabled={savingKitchen}>
+          <button type="submit" className="pd-btn" disabled={savingKitchen || !profileReady}>
             {savingKitchen ? "Saving…" : "Save details"}
           </button>
         </form>
@@ -183,7 +304,9 @@ export default function ProviderDashboard() {
 
       <section className="pd-section">
         <h3 className="pd-section-title">Orders snapshot</h3>
-        {!summary ? (
+        {summaryError ? (
+          <p className="pd-banner pd-banner-error">{summaryError}</p>
+        ) : !summary ? (
           <p className="pd-muted">Loading summary…</p>
         ) : (
           <div className="pd-stats">
@@ -209,7 +332,11 @@ export default function ProviderDashboard() {
           <button type="button" className="pd-btn" onClick={() => navigate("/provider/orders")}>
             View orders
           </button>
-          <button type="button" className="pd-btn pd-btn-secondary" onClick={() => navigate("/provider/menu")}>
+          <button
+            type="button"
+            className="pd-btn pd-btn-secondary"
+            onClick={() => navigate("/provider/menu")}
+          >
             Manage menu
           </button>
         </div>
@@ -227,9 +354,16 @@ export default function ProviderDashboard() {
               className="pd-btn pd-btn-danger"
               onClick={async () => {
                 if (!window.confirm("Deactivate your account?")) return;
-                await api.put("/providers/deactivate");
-                alert("Account deactivated");
-                setIsActive(false);
+                try {
+                  await api.put("/providers/deactivate");
+                  setToast({ type: "success", message: "Account deactivated." });
+                  setIsActive(false);
+                } catch (err) {
+                  setToast({
+                    type: "error",
+                    message: err.response?.data?.message || "Could not deactivate.",
+                  });
+                }
               }}
             >
               Deactivate account
@@ -242,9 +376,16 @@ export default function ProviderDashboard() {
               type="button"
               className="pd-btn"
               onClick={async () => {
-                await api.put("/providers/reactivate");
-                alert("Account reactivated");
-                setIsActive(true);
+                try {
+                  await api.put("/providers/reactivate");
+                  setToast({ type: "success", message: "Account reactivated." });
+                  setIsActive(true);
+                } catch (err) {
+                  setToast({
+                    type: "error",
+                    message: err.response?.data?.message || "Could not reactivate.",
+                  });
+                }
               }}
             >
               Reactivate account

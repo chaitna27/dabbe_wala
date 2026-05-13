@@ -37,7 +37,7 @@ exports.register = async (req, res) => {
 
     if (role === "provider") {
       await Provider.create({
-        userId: user._id,
+        user: user._id,
         kitchenName: `${name.trim()}'s Kitchen`,
         location: "Near Hostel Road",
         latitude: null,

@@ -1,8 +1,13 @@
 const mongoose = require("mongoose");
 
+/**
+ * Canonical provider document (MongoDB / API):
+ * user, kitchenName, location, latitude, longitude, phone, whatsapp,
+ * vegOnly, isVerified, isActive, createdAt, updatedAt
+ */
 const providerSchema = new mongoose.Schema(
   {
-    userId: {
+    user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,

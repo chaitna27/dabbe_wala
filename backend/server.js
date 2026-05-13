@@ -4,7 +4,6 @@ const path = require("path");
 
 require("dotenv").config();
 const connectDB = require("./src/config/db");
-connectDB();
 
 const authRoutes = require("./src/routes/auth.routes");
 const menuRoutes = require("./src/routes/menu.routes");
@@ -46,7 +45,15 @@ app.get("/health", (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
 
+async function start() {
+  await connectDB();
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+start().catch((err) => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
+});

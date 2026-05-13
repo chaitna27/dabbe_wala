@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const Review = require("../models/Review");
-const Provider = require("../models/Provider");
+const { ensureProviderForUser } = require("../utils/providerForUser");
 
 exports.addReview = async (req, res) => {
   const studentId = req.user.id;
@@ -64,7 +64,7 @@ exports.getProviderReviews = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const provider = await Provider.findOne({ userId });
+    const provider = await ensureProviderForUser(userId);
     if (!provider) {
       return res.status(404).json({ message: "Provider not found" });
     }

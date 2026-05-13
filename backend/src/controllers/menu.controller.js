@@ -1,8 +1,19 @@
 const mongoose = require("mongoose");
 const Menu = require("../models/Menu");
 const Provider = require("../models/Provider");
+const { ensureProviderForUser } = require("../utils/providerForUser");
 
 const normalize = (v) => (typeof v === "string" ? v.trim().toLowerCase() : v);
+
+/** Parses booleans from JSON or multipart form strings ("0" / "1"). */
+function parseBoolFlag(v) {
+  if (v === undefined || v === null || v === "") return undefined;
+  if (typeof v === "boolean") return v;
+  const s = String(v).trim().toLowerCase();
+  if (s === "true" || s === "1" || s === "yes" || s === "on") return true;
+  if (s === "false" || s === "0" || s === "no" || s === "off") return false;
+  return undefined;
+}
 
 const menuPublicShape = (m) => ({
   id: m._id.toString(),
@@ -34,6 +45,7 @@ exports.getMenus = async (req, res) => {
 };
 
 exports.createMenu = async (req, res) => {
+  console.log("req.user:", req.user);
   const userId = req.user.id;
   const { items, price, day, meal_type, mealType, is_veg, isVeg } = req.body;
   const image = req.file?.path || null;
@@ -50,12 +62,13 @@ exports.createMenu = async (req, res) => {
   }
 
   const vegFlag = is_veg !== undefined ? is_veg : isVeg;
-  const isVegBool = vegFlag === undefined ? true : Boolean(vegFlag);
+  const vegParsed = parseBoolFlag(vegFlag);
+  const isVegBool = vegParsed === undefined ? true : vegParsed;
 
   try {
-    const provider = await Provider.findOne({ userId });
+    const provider = await ensureProviderForUser(userId);
     if (!provider) {
-      return res.status(403).json({ message: "Not a provider" });
+      return res.status(404).json({ message: "Provider not found" });
     }
 
     const menu = await Menu.create({
@@ -82,12 +95,13 @@ exports.createMenu = async (req, res) => {
 };
 
 exports.getProviderMenus = async (req, res) => {
+  console.log("req.user:", req.user);
   const userId = req.user.id;
 
   try {
-    const provider = await Provider.findOne({ userId });
+    const provider = await ensureProviderForUser(userId);
     if (!provider) {
-      return res.status(403).json({ message: "Not a provider" });
+      return res.status(404).json({ message: "Provider not found" });
     }
 
     const menus = await Menu.find({ provider: provider._id })
@@ -123,14 +137,15 @@ exports.updateMenu = async (req, res) => {
     return res.status(400).json({ message: "Invalid menu id" });
   }
 
-  const avail =
-    is_available !== undefined ? is_available : isAvailable;
-  const veg = is_veg !== undefined ? is_veg : isVeg;
+  const availRaw = is_available !== undefined ? is_available : isAvailable;
+  const avail = parseBoolFlag(availRaw);
+  const vegRaw = is_veg !== undefined ? is_veg : isVeg;
+  const veg = parseBoolFlag(vegRaw);
 
   try {
-    const provider = await Provider.findOne({ userId: req.user.id });
+    const provider = await ensureProviderForUser(req.user.id);
     if (!provider) {
-      return res.status(403).json({ message: "Not a provider" });
+      return res.status(404).json({ message: "Provider not found" });
     }
 
     const menu = await Menu.findOne({ _id: id, provider: provider._id });
@@ -146,8 +161,8 @@ exports.updateMenu = async (req, res) => {
       }
       menu.price = p;
     }
-    if (avail !== undefined) menu.is_available = Boolean(avail);
-    if (veg !== undefined) menu.is_veg = Boolean(veg);
+    if (avail !== undefined) menu.is_available = avail;
+    if (veg !== undefined) menu.is_veg = veg;
     if (image) menu.image = image;
 
     await menu.save();
@@ -166,9 +181,9 @@ exports.deleteMenu = async (req, res) => {
   }
 
   try {
-    const provider = await Provider.findOne({ userId: req.user.id });
+    const provider = await ensureProviderForUser(req.user.id);
     if (!provider) {
-      return res.status(403).json({ message: "Not a provider" });
+      return res.status(404).json({ message: "Provider not found" });
     }
 
     const result = await Menu.deleteOne({ _id: id, provider: provider._id });

@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const Menu = require("../models/Menu");
 const User = require("../models/User");
-const Provider = require("../models/Provider");
+const { ensureProviderForUser } = require("../utils/providerForUser");
 const Review = require("../models/Review");
 
 exports.createOrder = async (req, res) => {
@@ -62,8 +62,8 @@ exports.getStudentOrders = async (req, res) => {
       .populate("menu", "items price")
       .populate({
         path: "provider",
-        select: "userId",
-        populate: { path: "userId", select: "name", model: "User" },
+        select: "user",
+        populate: { path: "user", select: "name", model: "User" },
       })
       .lean();
 
@@ -82,7 +82,7 @@ exports.getStudentOrders = async (req, res) => {
       order_date: o.order_date,
       items: o.menu?.items,
       price: o.menu?.price,
-      provider_name: o.provider?.userId?.name,
+      provider_name: o.provider?.user?.name,
       reviewed: reviewedSet.has(o._id.toString()),
     }));
 
@@ -100,9 +100,9 @@ exports.getProviderOrders = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const provider = await Provider.findOne({ userId });
+    const provider = await ensureProviderForUser(userId);
     if (!provider) {
-      return res.status(403).json({ message: "Provider profile missing" });
+      return res.status(404).json({ message: "Provider not found" });
     }
 
     const orders = await Order.find({ provider: provider._id })
@@ -142,9 +142,9 @@ exports.updateOrderStatus = async (req, res) => {
   }
 
   try {
-    const provider = await Provider.findOne({ userId });
+    const provider = await ensureProviderForUser(userId);
     if (!provider) {
-      return res.status(403).json({ message: "Not a provider" });
+      return res.status(404).json({ message: "Provider not found" });
     }
 
     const order = await Order.findOneAndUpdate(
@@ -171,9 +171,9 @@ exports.getProviderSummary = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const provider = await Provider.findOne({ userId });
+    const provider = await ensureProviderForUser(userId);
     if (!provider) {
-      return res.status(403).json({ message: "Provider profile missing" });
+      return res.status(404).json({ message: "Provider not found" });
     }
 
     const pid = provider._id;

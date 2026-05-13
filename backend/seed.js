@@ -63,7 +63,7 @@ async function run() {
   });
 
   const prov1 = await Provider.create({
-    userId: providerUser1._id,
+    user: providerUser1._id,
     kitchenName: "Ghar Ka Dabba",
     location: "Near Campus Gate",
     latitude: 18.5204,
@@ -76,7 +76,7 @@ async function run() {
   });
 
   const prov2 = await Provider.create({
-    userId: providerUser2._id,
+    user: providerUser2._id,
     kitchenName: "Tiffin Express",
     location: "Main Road",
     latitude: 18.5314,

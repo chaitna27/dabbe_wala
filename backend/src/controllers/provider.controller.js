@@ -3,6 +3,10 @@ const Order = require("../models/Order");
 const Review = require("../models/Review");
 const Menu = require("../models/Menu");
 const { haversineKm, formatDistanceLabel, parseLatLng } = require("../utils/geo");
+const {
+  ensureProviderForUser,
+  providerMatch,
+} = require("../utils/providerForUser");
 
 async function ratingForProvider(providerId) {
   const orderIds = await Order.find({ provider: providerId }).distinct("_id");
@@ -57,7 +61,7 @@ exports.getPublicProviders = async (req, res) => {
 
         return {
           id: p._id.toString(),
-          userId: p.userId?.toString?.() ?? String(p.userId),
+          user: p.user ? p.user.toString() : "",
           kitchenName: p.kitchenName || "",
           location: p.location || "",
           phone: p.phone || "",
@@ -135,10 +139,10 @@ exports.getPublicProviders = async (req, res) => {
 };
 
 exports.getProviderDashboard = async (req, res) => {
-  const userId = req.user.id;
-
   try {
-    const provider = await Provider.findOne({ userId });
+    console.log("req.user:", req.user);
+    const provider = await ensureProviderForUser(req.user.id);
+    console.log("Provider found:", provider?._id?.toString(), provider?.kitchenName);
     if (!provider) {
       return res.status(404).json({ message: "Provider not found" });
     }
@@ -178,43 +182,46 @@ exports.getProviderDashboard = async (req, res) => {
       average_rating,
     });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    console.error("getProviderDashboard:", err);
+    return res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
 exports.deactivateProvider = async (req, res) => {
-  const userId = req.user.id;
-
   try {
-    await Provider.findOneAndUpdate(
-      { userId },
-      { isActive: false },
-      { new: true },
-    );
+    const q = providerMatch(req.user.id);
+    if (!q) {
+      return res.status(404).json({ message: "Provider not found" });
+    }
+    await Provider.findOneAndUpdate(q, { isActive: false }, { new: true });
 
     return res.json({ message: "Account deactivated successfully" });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    console.error("deactivateProvider:", err);
+    return res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
 exports.reactivateProvider = async (req, res) => {
-  const userId = req.user.id;
-
   try {
-    await Provider.findOneAndUpdate({ userId }, { isActive: true });
+    const q = providerMatch(req.user.id);
+    if (!q) {
+      return res.status(404).json({ message: "Provider not found" });
+    }
+    await Provider.findOneAndUpdate(q, { isActive: true });
 
     return res.json({ message: "Account reactivated successfully" });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    console.error("reactivateProvider:", err);
+    return res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
 exports.getProviderProfile = async (req, res) => {
-  const userId = req.user.id;
-
   try {
-    const provider = await Provider.findOne({ userId }).lean();
+    console.log("req.user:", req.user);
+    const provider = await ensureProviderForUser(req.user.id);
+    console.log("Provider found:", provider?._id?.toString(), provider?.kitchenName);
     if (!provider) {
       return res.status(404).json({ message: "Provider not found" });
     }
@@ -229,12 +236,12 @@ exports.getProviderProfile = async (req, res) => {
       longitude: provider.longitude == null ? null : provider.longitude,
     });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    console.error("getProviderProfile:", err);
+    return res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
-exports.patchProviderProfile = async (req, res) => {
-  const userId = req.user.id;
+async function saveProviderProfile(req, res) {
   const {
     kitchenName,
     location,
@@ -245,7 +252,9 @@ exports.patchProviderProfile = async (req, res) => {
   } = req.body;
 
   try {
-    const provider = await Provider.findOne({ userId });
+    console.log("req.user:", req.user);
+    const provider = await ensureProviderForUser(req.user.id);
+    console.log("Provider found:", provider?._id?.toString(), provider?.kitchenName);
     if (!provider) {
       return res.status(404).json({ message: "Provider not found" });
     }
@@ -269,7 +278,9 @@ exports.patchProviderProfile = async (req, res) => {
       } else {
         const la = Number(latitude);
         if (!Number.isFinite(la) || la < -90 || la > 90) {
-          return res.status(400).json({ message: "latitude must be between -90 and 90" });
+          return res
+            .status(400)
+            .json({ message: "latitude must be a number between -90 and 90" });
         }
         provider.latitude = la;
       }
@@ -281,7 +292,9 @@ exports.patchProviderProfile = async (req, res) => {
       } else {
         const lo = Number(longitude);
         if (!Number.isFinite(lo) || lo < -180 || lo > 180) {
-          return res.status(400).json({ message: "longitude must be between -180 and 180" });
+          return res
+            .status(400)
+            .json({ message: "longitude must be a number between -180 and 180" });
         }
         provider.longitude = lo;
       }
@@ -300,6 +313,13 @@ exports.patchProviderProfile = async (req, res) => {
       longitude: provider.longitude == null ? null : provider.longitude,
     });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    console.error("saveProviderProfile:", err);
+    if (err.name === "ValidationError") {
+      return res.status(400).json({ message: err.message });
+    }
+    return res.status(500).json({ message: err.message || "Server error" });
   }
-};
+}
+
+exports.patchProviderProfile = saveProviderProfile;
+exports.putProviderProfile = saveProviderProfile;
