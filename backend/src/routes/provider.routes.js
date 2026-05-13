@@ -19,7 +19,19 @@ router.put("/deactivate", authMiddleware, providerController.deactivateProvider)
 
 router.put("/reactivate", authMiddleware, providerController.reactivateProvider);
 
-router.get("/profile", authMiddleware, providerController.getProviderProfile);
+router.get(
+  "/profile",
+  authMiddleware,
+  allowRoles("provider"),
+  providerController.getProviderProfile,
+);
+
+router.patch(
+  "/profile",
+  authMiddleware,
+  allowRoles("provider"),
+  providerController.patchProviderProfile,
+);
 
 module.exports = router;
 

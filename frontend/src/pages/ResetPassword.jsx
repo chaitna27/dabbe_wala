@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "../api";
+import Input from "../components/Input";
+import "../styles/Auth.css";
 
 export default function ResetPassword() {
   const { token } = useParams();
@@ -13,6 +15,11 @@ export default function ResetPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!token) {
+      alert("Invalid reset link");
+      return;
+    }
 
     if (!password || !confirmPassword) {
       alert("Please fill all fields");
@@ -31,19 +38,17 @@ export default function ResetPassword() {
 
     try {
       setLoading(true);
-      const res = await api.post(`/auth/reset-password/${token}`, {
+      const res = await api.post(`/auth/reset-password/${encodeURIComponent(token)}`, {
         password,
       });
 
-      setMessage(res.data.message || "Password reset successful");
+      setMessage(res.data?.message || "Password reset successful");
 
-      // Auto redirect to login after success
       setTimeout(() => {
         localStorage.removeItem("token");
         localStorage.removeItem("role");
         navigate("/login", { replace: true });
       }, 2000);
-      
     } catch (err) {
       alert(err.response?.data?.message || "Invalid or expired token");
     } finally {
@@ -51,48 +56,58 @@ export default function ResetPassword() {
     }
   };
 
+  if (!token) {
+    return (
+      <div className="auth-page-wrapper">
+        <div className="auth-card">
+          <h2 className="auth-title">Invalid link</h2>
+          <p className="auth-muted">Open the reset link from your email again, or request a new one.</p>
+          <p className="auth-footer">
+            <Link to="/forgot-password">Forgot password</Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container" style={{ maxWidth: "400px" }}>
-      <h2>Reset Password 🔑</h2>
+    <div className="auth-page-wrapper">
+      <div className="auth-card">
+        <h2 className="auth-title">Reset password</h2>
+        <p className="auth-subtitle">Choose a new password for your account</p>
 
-      <form onSubmit={handleSubmit}>
-        <input
-          type="password"
-          placeholder="New password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
-        />
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="input-group">
+            <label>New password</label>
+            <Input
+              type="password"
+              placeholder="At least 6 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <div className="input-group">
+            <label>Confirm password</label>
+            <Input
+              type="password"
+              placeholder="Repeat password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </div>
 
-        <input
-          type="password"
-          placeholder="Confirm new password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
-        />
+          <button type="submit" className="auth-btn" disabled={loading}>
+            {loading ? "Updating…" : "Update password"}
+          </button>
+        </form>
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: "100%",
-            background: "#c05a2b",
-            color: "white",
-            padding: "8px",
-            border: "none",
-            borderRadius: "5px",
-            cursor: "pointer",
-          }}
-        >
-          {loading ? "Resetting..." : "Reset Password"}
-        </button>
-      </form>
+        {message ? <p className="auth-success">{message}</p> : null}
+        <p className="auth-muted">Redirecting to login after success…</p>
 
-      {message && (
-        <p style={{ marginTop: "10px", color: "green" }}>{message}</p>
-      )}
+        <p className="auth-footer">
+          <Link to="/login">Back to login</Link>
+        </p>
+      </div>
     </div>
   );
 }
-

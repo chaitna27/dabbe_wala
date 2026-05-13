@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "../api";
 import { Navigate, useNavigate } from "react-router-dom";
 import "../styles/StudentProviders.css";
 import { dialDigitsForLink } from "../utils/phone";
+import { readStudentGeo, writeStudentGeo } from "../utils/studentGeo";
 
 export default function StudentProviders() {
   const token = localStorage.getItem("token");
@@ -10,19 +11,73 @@ export default function StudentProviders() {
   const navigate = useNavigate();
 
   const [providers, setProviders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoError, setGeoError] = useState("");
+  const [studentGeo, setStudentGeo] = useState(() => readStudentGeo());
+
+  const [sortBy, setSortBy] = useState("nearest");
+  const [vegOnly, setVegOnly] = useState(false);
+  const [minRating, setMinRating] = useState(0);
+
+  const fetchProviders = useCallback(async () => {
+    try {
+      setLoading(true);
+      const g = studentGeo;
+      const params = {
+        vegOnly: vegOnly ? "true" : "false",
+        minRating: minRating > 0 ? minRating : undefined,
+      };
+      let sortParam = sortBy;
+      if (g) {
+        params.lat = g.lat;
+        params.lng = g.lng;
+      } else if (sortBy === "nearest") {
+        sortParam = "rating";
+      }
+      params.sort = sortParam;
+      const res = await api.get("/providers/public", { params });
+      setProviders(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      alert("Failed to load providers");
+      setProviders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [studentGeo, sortBy, vegOnly, minRating]);
 
   useEffect(() => {
     fetchProviders();
-  }, []);
+  }, [fetchProviders]);
 
-  const fetchProviders = async () => {
-    try {
-      const res = await api.get("/providers/public");
-      setProviders(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      alert("Failed to load providers");
-      setProviders([]);
+  const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      setGeoError("Location is not supported in this browser.");
+      return;
     }
+    setGeoError("");
+    setGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        writeStudentGeo(lat, lng);
+        setStudentGeo({ lat, lng });
+        setSortBy("nearest");
+        setGeoLoading(false);
+      },
+      () => {
+        setGeoError("Could not read your location. Check browser permissions.");
+        setGeoLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+    );
+  };
+
+  const clearLocation = () => {
+    sessionStorage.removeItem("dabbeStudentGeo");
+    setStudentGeo(null);
+    if (sortBy === "nearest") setSortBy("rating");
   };
 
   const callProvider = (phone) => {
@@ -48,108 +103,151 @@ export default function StudentProviders() {
   }
 
   return (
-    <div className="container">
+    <div className="student-providers-page">
       <h2>Available Tiffin Providers</h2>
+      <p className="student-providers-sub">
+        Browse kitchens, sort by distance or price, and open a menu to order.
+      </p>
 
-      {providers.length === 0 ? (
-        <p>No providers available</p>
+      <div className="sp-toolbar">
+        <button
+          type="button"
+          className="sp-btn sp-btn-primary"
+          onClick={useMyLocation}
+          disabled={geoLoading}
+        >
+          {geoLoading ? "Locating…" : "📍 Use my location"}
+        </button>
+        {studentGeo && (
+          <button type="button" className="sp-btn" onClick={clearLocation}>
+            Clear location
+          </button>
+        )}
+        {geoError && <p className="sp-geo-hint">{geoError}</p>}
+        {!studentGeo && (
+          <p className="sp-geo-hint">
+            Turn on location to sort by nearest kitchen and see &quot;km away&quot; labels.
+          </p>
+        )}
+      </div>
+
+      <div className="sp-filters">
+        <div>
+          <div className="sp-filter-label">Sort</div>
+          <select
+            className="sp-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="nearest">Nearest</option>
+            <option value="rating">Highest rated</option>
+            <option value="pricelow">Menu price: low → high</option>
+            <option value="pricehigh">Menu price: high → low</option>
+            <option value="name">Name (A–Z)</option>
+          </select>
+        </div>
+        <div>
+          <div className="sp-filter-label">Min rating</div>
+          <select
+            className="sp-select"
+            value={String(minRating)}
+            onChange={(e) => setMinRating(Number(e.target.value))}
+          >
+            <option value="0">Any</option>
+            <option value="3">3+</option>
+            <option value="4">4+</option>
+            <option value="4.5">4.5+</option>
+          </select>
+        </div>
+        <button
+          type="button"
+          className={`sp-pill ${vegOnly ? "active" : ""}`}
+          onClick={() => setVegOnly(!vegOnly)}
+        >
+          Veg only kitchens
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="sp-empty">Loading kitchens…</div>
+      ) : providers.length === 0 ? (
+        <div className="sp-empty">
+          No providers match these filters. Try clearing filters or location.
+        </div>
       ) : (
-        <div className="provider-grid">
+        <div className="provider-grid-sp">
           {providers.map((p) => {
             const name = p.kitchenName ?? p.kitchen_name ?? "Kitchen";
             const wa = p.whatsapp || p.phone;
+            const minP = p.minMenuPrice;
             return (
-            <div
-              key={p.id}
-              style={{
-                border: "1px solid #ddd",
-                padding: "16px",
-                borderRadius: "10px",
-                width: "260px",
-              }}
-            >
-              <h3>{name}</h3>
-              <p>{p.location || ""}</p>
-              <p style={{ fontSize: "12px", color: "#666", margin: "4px 0" }}>
-                {p.isActive === false ? "○ Inactive" : "● Active"}
-                {p.vegOnly ? " · Veg only" : ""}
-              </p>
+              <div key={p.id} className="sp-card">
+                <h3>{name}</h3>
+                <p className="sp-card-loc">📍 {p.location || "—"}</p>
+                {p.distanceLabel ? (
+                  <p className="sp-distance">{p.distanceLabel}</p>
+                ) : null}
+                <p className="sp-meta-line">
+                  {p.isActive === false ? "○ Inactive" : "● Active"}
+                  {p.vegOnly ? " · Veg only" : ""}
+                </p>
+                {minP != null && Number.isFinite(minP) ? (
+                  <p className="sp-price-hint">Menus from ₹{minP}</p>
+                ) : null}
 
-              {/* ⭐ Rating / 🆕 New + 📞 Dial */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-               {Number(p.rating) > 0 ? (
-                 <span>⭐ {Number(p.rating).toFixed(1)}</span>
-               ) : (
-                <span
-                  style={{
-                    background: "#e8f5e9",
-                    color: "#2e7d32",
-                    padding: "2px 8px",
-                    borderRadius: "12px",
-                    fontSize: "13px",
-                    fontWeight: "500",
-                  }}
-                >
-                  🆕 New
-                </span>
-              )}
+                <div className="sp-actions-row">
+                  {Number(p.rating) > 0 ? (
+                    <span style={{ fontWeight: 700, color: "#444" }}>
+                      ⭐ {Number(p.rating).toFixed(1)}
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        background: "#e8f5e9",
+                        color: "#2e7d32",
+                        padding: "2px 8px",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      New
+                    </span>
+                  )}
+                  {p.phone && (
+                    <button
+                      type="button"
+                      title="Call"
+                      className="sp-icon-btn"
+                      onClick={() => callProvider(p.phone)}
+                    >
+                      📞
+                    </button>
+                  )}
+                  {wa && (
+                    <button
+                      type="button"
+                      title="WhatsApp"
+                      className="sp-icon-btn"
+                      onClick={() => openWhatsApp(wa)}
+                    >
+                      💬
+                    </button>
+                  )}
+                </div>
 
-              {p.phone && (
-                <button
-                  title="Call Provider"
-                  onClick={() => callProvider(p.phone)}
-                  style={{
-                    border: "1px solid #ccc",
-                    background: "white",
-                     borderRadius: "50%",
-                     width: "32px",
-                    height: "32px",
-                    cursor: "pointer",
-                  }}
-                >
-                   📞
-                </button>
-              )}
-              {wa && (
                 <button
                   type="button"
-                  title="WhatsApp"
-                  onClick={() => openWhatsApp(wa)}
-                  style={{
-                    border: "1px solid #ccc",
-                    background: "white",
-                    borderRadius: "50%",
-                    width: "32px",
-                    height: "32px",
-                    cursor: "pointer",
-                  }}
+                  className="sp-view-menu"
+                  onClick={() => navigate(`/student/find-meals/${p.id}`)}
                 >
-                  💬
+                  View menu
                 </button>
-              )}
-            </div>
-
-
-              <button
-                onClick={() => navigate(`/student/find-meals/${p.id}`)}
-                style={{
-                  marginTop: "10px",
-                  background: "#c05a2b",
-                  color: "white",
-                  border: "none",
-                  padding: "8px 14px",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                }}
-              >
-                View Menu
-              </button>
-            </div>
-          );
+              </div>
+            );
           })}
         </div>
       )}
     </div>
   );
 }
-

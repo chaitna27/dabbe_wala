@@ -232,3 +232,44 @@ html {
     grid-template-columns: 1fr;
   }
 }
+
+.landing-geo-btn {
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 2px solid #c05a2b;
+  background: #fff;
+  color: #1a3c34;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.landing-geo-btn:hover:not(:disabled) {
+  background: #c05a2b;
+  color: #fff;
+}
+
+.landing-geo-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.landing-geo-note {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.landing-distance {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #c05a2b;
+  margin: 0 0 8px;
+}
+
+.landing-from-price {
+  font-size: 0.85rem;
+  color: #555;
+  margin: 0 0 12px;
+}

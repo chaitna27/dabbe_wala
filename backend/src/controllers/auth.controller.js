@@ -40,6 +40,8 @@ exports.register = async (req, res) => {
         userId: user._id,
         kitchenName: `${name.trim()}'s Kitchen`,
         location: "Near Hostel Road",
+        latitude: null,
+        longitude: null,
         vegOnly: false,
         isVerified: true,
         isActive: true,
@@ -165,15 +167,20 @@ exports.forgotPassword = async (req, res) => {
     return res.status(400).json({ message: "Email required" });
   }
 
-  const { user: emailUser, pass: emailPass } = getEmailCredentials();
-  if (!emailUser || !emailPass) {
-    return res.status(503).json({
-      message:
-        "Password reset email is not available: set EMAIL_USER and EMAIL_PASS (Gmail app password) on the server.",
-    });
-  }
-
   const normalized = String(email).toLowerCase().trim();
+  const creds = getEmailCredentials();
+  const devLinkResponse =
+    process.env.ALLOW_RESET_LINK_IN_RESPONSE === "true" ||
+    process.env.ALLOW_RESET_LINK_IN_RESPONSE === "1";
+
+  if (!creds.user || !creds.pass) {
+    if (!devLinkResponse) {
+      return res.status(503).json({
+        message:
+          "Password reset email is not configured. Set EMAIL_USER and EMAIL_PASS (16-character Gmail App Password, not your normal password). For local testing only, set ALLOW_RESET_LINK_IN_RESPONSE=true to receive resetLink in the JSON response.",
+      });
+    }
+  }
 
   try {
     const user = await User.findOne({ email: normalized });
@@ -199,6 +206,14 @@ exports.forgotPassword = async (req, res) => {
     );
     const resetLink = `${frontendBase}/reset-password/${rawToken}`;
 
+    if (!creds.user || !creds.pass) {
+      return res.json({
+        message:
+          "Development mode: password reset link generated (email not configured).",
+        devResetLink: resetLink,
+      });
+    }
+
     try {
       await sendPasswordResetEmail(normalized, resetLink);
     } catch (mailErr) {
@@ -210,11 +225,15 @@ exports.forgotPassword = async (req, res) => {
       return res.status(502).json({
         message:
           mailErr.message ||
-          "Could not send reset email. Check EMAIL_USER / EMAIL_PASS and Gmail app password settings.",
+          "Could not send email. Confirm Gmail App Password (16 characters) and that 'Less secure app access' is not required—use App Passwords with 2FA.",
       });
     }
 
-    return res.json({ message: "Password reset link sent" });
+    const payload = { message: "Password reset link sent" };
+    if (devLinkResponse) {
+      payload.devResetLink = resetLink;
+    }
+    return res.json(payload);
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }

@@ -531,6 +531,13 @@
   margin-top: 8px;
 }
 
+.provider-distance-line {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #c05a2b;
+}
+
 @media (max-width: 900px) {
   .provider-hero-card {
     flex-direction: column;

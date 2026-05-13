@@ -1,11 +1,14 @@
 import { useState } from "react";
 import api from "../api";
 import { Link } from "react-router-dom";
+import Input from "../components/Input";
+import "../styles/Auth.css";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [devLink, setDevLink] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,54 +20,60 @@ export default function ForgotPassword() {
 
     try {
       setLoading(true);
+      setMessage("");
+      setDevLink("");
       const res = await api.post("/auth/forgot-password", { email });
-      setMessage(res.data.message);
+      setMessage(res.data?.message || "Check your email.");
+      if (res.data?.devResetLink) {
+        setDevLink(res.data.devResetLink);
+      }
     } catch (err) {
-      alert(
-        err.response?.data?.message || "Failed to send reset email"
-      );
+      const msg = err.response?.data?.message || "Failed to send reset email";
+      alert(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="container" style={{ maxWidth: "400px" }}>
-      <h2>Forgot Password 🔐</h2>
+    <div className="auth-page-wrapper">
+      <div className="auth-card">
+        <h2 className="auth-title">Forgot password</h2>
+        <p className="auth-subtitle">We&apos;ll send a secure link to reset your password</p>
 
-      <form onSubmit={handleSubmit}>
-        <input
-          type="email"
-          placeholder="Enter your registered email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
-        />
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="input-group">
+            <label>Email</label>
+            <Input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: "100%",
-            background: "#c05a2b",
-            color: "white",
-            padding: "8px",
-            border: "none",
-            borderRadius: "5px",
-            cursor: "pointer",
-          }}
-        >
-          {loading ? "Sending..." : "Send Reset Link"}
-        </button>
-      </form>
+          <button type="submit" className="auth-btn" disabled={loading}>
+            {loading ? "Sending…" : "Send reset link"}
+          </button>
+        </form>
 
-      {message && (
-        <p style={{ marginTop: "10px", color: "green" }}>{message}</p>
-      )}
+        {message ? <p className="auth-success">{message}</p> : null}
 
-      <p style={{ marginTop: "10px" }}>
-        <Link to="/login">Back to Login</Link>
-      </p>
+        {devLink ? (
+          <div className="auth-dev-box">
+            <strong>Local / dev only:</strong> email is not configured or dev flag is on. Use this link once:
+            <code>{devLink}</code>
+          </div>
+        ) : null}
+
+        <p className="auth-muted">
+          Production uses Gmail with a 16-character App Password (Google Account → Security → 2-Step Verification → App passwords).
+        </p>
+
+        <p className="auth-footer">
+          <Link to="/login">Back to login</Link>
+        </p>
+      </div>
     </div>
   );
 }

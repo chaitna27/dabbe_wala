@@ -4,6 +4,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import "../styles/common.css";
 import "../styles/StudentFindMeals.css";
 import { dialDigitsForLink } from "../utils/phone";
+import { readStudentGeo } from "../utils/studentGeo";
 
 function isMenuVeg(m) {
   if (m.isVeg !== undefined) return Boolean(m.isVeg);
@@ -45,7 +46,12 @@ export default function StudentFindMeals() {
       const res = await api.get(`/menus/provider/${providerId}`);
       setMenus(Array.isArray(res.data) ? res.data : []);
 
-      const providerRes = await api.get("/providers/public");
+      const geo = readStudentGeo();
+      const providerRes = await api.get("/providers/public", {
+        params: geo
+          ? { lat: geo.lat, lng: geo.lng, sort: "nearest" }
+          : {},
+      });
       const list = Array.isArray(providerRes.data) ? providerRes.data : [];
       const selected = list.find((p) => String(p.id) === String(providerId));
       setProvider(selected || null);
@@ -201,6 +207,9 @@ export default function StudentFindMeals() {
                 💬
               </button>
             </div>
+            {provider?.distanceLabel ? (
+              <p className="provider-distance-line">{provider.distanceLabel}</p>
+            ) : null}
 
             <div className="provider-status-row">
               <span className={`provider-status-pill ${provider.isActive !== false ? "on" : "off"}`}>

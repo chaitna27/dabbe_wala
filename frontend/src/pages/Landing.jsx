@@ -1,25 +1,54 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "../api";
 import { useNavigate } from "react-router-dom";
 import "./../styles/Landing.css";
 import { dialDigitsForLink } from "../utils/phone";
+import { readStudentGeo, writeStudentGeo } from "../utils/studentGeo";
 
 function Landing() {
-    const [providers, setProviders] = useState([]);
-    const navigate = useNavigate();
+  const [providers, setProviders] = useState([]);
+  const [studentGeo, setStudentGeo] = useState(() => readStudentGeo());
+  const [geoLoading, setGeoLoading] = useState(false);
+  const navigate = useNavigate();
 
-    useEffect(() => {
-  const fetchProviders = async () => {
+  const fetchProviders = useCallback(async () => {
     try {
-      const res = await api.get("/providers/public");
+      const g = studentGeo;
+      const params = {};
+      if (g) {
+        params.lat = g.lat;
+        params.lng = g.lng;
+        params.sort = "nearest";
+      } else {
+        params.sort = "rating";
+      }
+      const res = await api.get("/providers/public", { params });
       setProviders(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Failed to load providers", err);
+      setProviders([]);
     }
-  };
+  }, [studentGeo]);
 
-  fetchProviders();
-}, []);
+  useEffect(() => {
+    fetchProviders();
+  }, [fetchProviders]);
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) return;
+    setGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        writeStudentGeo(lat, lng);
+        setStudentGeo({ lat, lng });
+        setGeoLoading(false);
+      },
+      () => setGeoLoading(false),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+    );
+  };
 
 
   return (
@@ -64,13 +93,27 @@ function Landing() {
           <div style={{ width: "60px", height: "4px", background: "#ff6d33", margin: "15px auto" }}></div>
         </div>
 
+        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+          <button
+            type="button"
+            className="landing-geo-btn"
+            onClick={useMyLocation}
+            disabled={geoLoading}
+          >
+            {geoLoading ? "Locating…" : "📍 Use my location"}
+          </button>
+          {studentGeo && (
+            <p className="landing-geo-note">Showing kitchens nearest to you first.</p>
+          )}
+        </div>
+
         <div className="provider-grid">
           {providers.length === 0 ? (
             <p style={{ fontSize: "18px", color: "#666" }}>Loading fresh meals for you...</p>
           ) : (
             providers.map((provider) => (
               <div key={provider.id} className="provider-card-animated">
-                {Number(provider.rating || 0) >= 0 && (
+                {Number(provider.rating || 0) >= 4 && (
                   <div className="recommended-badge">
                     <span>✨</span> RECOMMENDED
                   </div>
@@ -79,9 +122,15 @@ function Landing() {
                 <h3 style={{ color: "var(--deep-green)", fontSize: "22px", marginBottom: "8px" }}>
                   {provider.kitchenName ?? provider.kitchen_name}
                 </h3>
-                <p style={{ color: "#666", marginBottom: "16px", fontSize: "14px" }}>
-                  📍 {provider.location}
+                <p style={{ color: "#666", marginBottom: "8px", fontSize: "14px" }}>
+                  📍 {provider.location || "—"}
                 </p>
+                {provider.distanceLabel ? (
+                  <p className="landing-distance">{provider.distanceLabel}</p>
+                ) : null}
+                {provider.minMenuPrice != null && Number.isFinite(provider.minMenuPrice) ? (
+                  <p className="landing-from-price">From ₹{provider.minMenuPrice}</p>
+                ) : null}
 
                 {/* Star Rating & Call Row */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>

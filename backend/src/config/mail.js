@@ -1,8 +1,9 @@
 const nodemailer = require("nodemailer");
 
 /**
- * Gmail / Google Workspace: use an App Password (2FA required), not the normal login password.
- * Env: EMAIL_USER, EMAIL_PASS (app password), optional EMAIL_FROM (defaults to EMAIL_USER).
+ * Gmail: use an App Password (Google Account → Security → 2-Step Verification → App passwords).
+ * Never use your normal Gmail password here.
+ * Env: EMAIL_USER, EMAIL_PASS (16-char app password, spaces optional), optional EMAIL_FROM.
  */
 function getEmailCredentials() {
   const user = process.env.EMAIL_USER?.trim();
@@ -24,15 +25,31 @@ function createMailTransport() {
       user,
       pass,
     },
+    tls: {
+      rejectUnauthorized: true,
+    },
   });
 }
 
+/**
+ * Verifies SMTP auth (catches wrong password / non–app-password / blocked sign-in).
+ */
 async function sendPasswordResetEmail(toEmail, resetUrl) {
   const transport = createMailTransport();
   if (!transport) {
     const err = new Error("EMAIL_NOT_CONFIGURED");
     err.code = "EMAIL_NOT_CONFIGURED";
     throw err;
+  }
+
+  try {
+    await transport.verify();
+  } catch (e) {
+    const wrap = new Error(
+      "Gmail SMTP verification failed. Use a 16-character App Password (not your normal password), with 2FA enabled on the Google account.",
+    );
+    wrap.cause = e;
+    throw wrap;
   }
 
   const from =

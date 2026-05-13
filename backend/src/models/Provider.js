@@ -23,6 +23,16 @@ const providerSchema = new mongoose.Schema(
       default: "",
     },
 
+    latitude: {
+      type: Number,
+      default: null,
+    },
+
+    longitude: {
+      type: Number,
+      default: null,
+    },
+
     phone: {
       type: String,
       trim: true,
