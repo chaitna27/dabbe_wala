@@ -3,7 +3,21 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Provider = require("../models/Provider");
-const { sendPasswordResetEmail, getEmailCredentials } = require("../config/mail");
+const {
+  sendPasswordResetEmail,
+  getEmailCredentials,
+  isMailConfigured,
+} = require("../config/mail");
+
+function maskEmail(email) {
+  if (!email || !String(email).includes("@")) return "<missing>";
+  const [name, domain] = String(email).split("@");
+  return `${name.slice(0, 2)}***@${domain}`;
+}
+
+function logForgotPassword(requestId, step, details = {}) {
+  console.log(`[forgot-password:${requestId}] ${step}`, details);
+}
 
 exports.register = async (req, res) => {
   const { name, email, password, role } = req.body;
@@ -162,31 +176,61 @@ exports.patchMe = async (req, res) => {
 
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
+  const requestId = crypto.randomBytes(4).toString("hex");
+
+  logForgotPassword(requestId, "request received", {
+    hasEmail: Boolean(email),
+  });
 
   if (!email) {
+    logForgotPassword(requestId, "validation failed", {
+      reason: "missing email",
+    });
     return res.status(400).json({ message: "Email required" });
   }
 
   const normalized = String(email).toLowerCase().trim();
   const creds = getEmailCredentials();
+  const mailConfigured = isMailConfigured();
   const devLinkResponse =
     process.env.ALLOW_RESET_LINK_IN_RESPONSE === "true" ||
     process.env.ALLOW_RESET_LINK_IN_RESPONSE === "1";
 
-  if (!creds.user || !creds.pass) {
+  logForgotPassword(requestId, "mail configuration checked", {
+    provider: creds.provider,
+    emailUser: maskEmail(creds.user),
+    emailPassPresent: Boolean(creds.pass),
+    emailFrom: maskEmail(creds.from),
+    resendApiKeyPresent: Boolean(creds.resendApiKey),
+    mailConfigured,
+    devLinkResponse,
+  });
+
+  if (!mailConfigured) {
     if (!devLinkResponse) {
+      logForgotPassword(requestId, "mail not configured");
       return res.status(503).json({
         message:
-          "Password reset email is not configured. Set EMAIL_USER and EMAIL_PASS (16-character Gmail App Password, not your normal password). For local testing only, set ALLOW_RESET_LINK_IN_RESPONSE=true to receive resetLink in the JSON response.",
+          "Password reset email is not configured. For Gmail, set EMAIL_USER and EMAIL_PASS. For Resend, set MAIL_PROVIDER=resend, RESEND_API_KEY, and EMAIL_FROM. For local testing only, set ALLOW_RESET_LINK_IN_RESPONSE=true to receive resetLink in the JSON response.",
       });
     }
   }
 
   try {
+    logForgotPassword(requestId, "looking up user", {
+      email: maskEmail(normalized),
+    });
     const user = await User.findOne({ email: normalized });
     if (!user) {
+      logForgotPassword(requestId, "user not found", {
+        email: maskEmail(normalized),
+      });
       return res.status(404).json({ message: "Email not found" });
     }
+
+    logForgotPassword(requestId, "user found", {
+      userId: user._id.toString(),
+    });
 
     const rawToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto
@@ -200,13 +244,23 @@ exports.forgotPassword = async (req, res) => {
       resetTokenExpiry: expiry,
     });
 
+    logForgotPassword(requestId, "reset token saved", {
+      userId: user._id.toString(),
+      expiresAt: expiry.toISOString(),
+    });
+
     const frontendBase = (process.env.FRONTEND_URL || "http://localhost:5173").replace(
       /\/$/,
       "",
     );
     const resetLink = `${frontendBase}/reset-password/${rawToken}`;
 
-    if (!creds.user || !creds.pass) {
+    logForgotPassword(requestId, "reset link generated", {
+      frontendBase,
+    });
+
+    if (!mailConfigured) {
+      logForgotPassword(requestId, "returning dev reset link");
       return res.json({
         message:
           "Development mode: password reset link generated (email not configured).",
@@ -215,17 +269,32 @@ exports.forgotPassword = async (req, res) => {
     }
 
     try {
+      logForgotPassword(requestId, "sending reset email", {
+        provider: creds.provider,
+        to: maskEmail(normalized),
+      });
       await sendPasswordResetEmail(normalized, resetLink);
+      logForgotPassword(requestId, "reset email sent");
     } catch (mailErr) {
-      console.error("forgotPassword mail:", mailErr);
+      console.error(`[forgot-password:${requestId}] mail send failed`, {
+        name: mailErr.name,
+        code: mailErr.code,
+        command: mailErr.command,
+        responseCode: mailErr.responseCode,
+        statusCode: mailErr.statusCode,
+        message: mailErr.message,
+      });
       await User.findByIdAndUpdate(user._id, {
         resetToken: null,
         resetTokenExpiry: null,
       });
+      logForgotPassword(requestId, "reset token cleared after mail failure", {
+        userId: user._id.toString(),
+      });
       return res.status(502).json({
         message:
           mailErr.message ||
-          "Could not send email. Confirm Gmail App Password (16 characters) and that 'Less secure app access' is not required—use App Passwords with 2FA.",
+          "Could not send password reset email. Check the configured email provider credentials and network access.",
       });
     }
 
@@ -233,8 +302,16 @@ exports.forgotPassword = async (req, res) => {
     if (devLinkResponse) {
       payload.devResetLink = resetLink;
     }
+    logForgotPassword(requestId, "response sent", {
+      devLinkIncluded: Boolean(payload.devResetLink),
+    });
     return res.json(payload);
   } catch (err) {
+    console.error(`[forgot-password:${requestId}] failed`, {
+      name: err.name,
+      code: err.code,
+      message: err.message,
+    });
     return res.status(500).json({ message: err.message });
   }
 };

@@ -53,7 +53,7 @@ export default function ForgotPassword() {
           </div>
 
           <button type="submit" className="auth-btn" disabled={loading}>
-            {loading ? "Sending…" : "Send reset link"}
+            {loading ? "Sending..." : "Send reset link"}
           </button>
         </form>
 
@@ -67,7 +67,7 @@ export default function ForgotPassword() {
         ) : null}
 
         <p className="auth-muted">
-          Production uses Gmail with a 16-character App Password (Google Account → Security → 2-Step Verification → App passwords).
+          Production email is sent by the backend mail provider configured in environment variables.
         </p>
 
         <p className="auth-footer">
