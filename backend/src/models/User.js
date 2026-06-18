@@ -21,9 +21,17 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
       minlength: 6,
       select: false,
+    },
+    googleId: {
+      type: String,
+      default: null,
+    },
+
+    avatar: {
+      type: String,
+      default: "",
     },
     role: {
       type: String,
@@ -39,7 +47,7 @@ const userSchema = new mongoose.Schema(
     resetToken: { type: String, default: null, select: false },
     resetTokenExpiry: { type: Date, default: null, select: false },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 userSchema.set("toJSON", {

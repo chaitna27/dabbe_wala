@@ -4,7 +4,7 @@ const https = require("https");
 const MAIL_PROVIDER = (
   process.env.MAIL_PROVIDER ||
   process.env.EMAIL_PROVIDER ||
-  (process.env.RESEND_API_KEY ? "resend" : "gmail")
+  "gmail"
 ).toLowerCase();
 
 function maskEmail(email) {

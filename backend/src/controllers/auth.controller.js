@@ -9,6 +9,10 @@ const {
   isMailConfigured,
 } = require("../config/mail");
 
+const { OAuth2Client } = require("google-auth-library");
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 function maskEmail(email) {
   if (!email || !String(email).includes("@")) return "<missing>";
   const [name, domain] = String(email).split("@");
@@ -100,6 +104,13 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    if (!user.password && user.googleId) {
+      return res.status(400).json({
+        message:
+          "This account uses Google Sign-In. Please continue with Google.",
+      });
+    }
+
     const match = await bcrypt.compare(password, user.password);
 
     if (!match) {
@@ -122,6 +133,7 @@ exports.login = async (req, res) => {
         id: user._id.toString(),
         name: user.name,
         role: user.role,
+        avatar: user.avatar || "",
       },
     });
   } catch (err) {
@@ -133,9 +145,101 @@ exports.login = async (req, res) => {
   }
 };
 
+exports.googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        message: "Google credential required",
+      });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+
+    const { sub, email, name, picture } = payload;
+
+    let user = await User.findOne({
+      email: email.toLowerCase().trim(),
+    });
+
+    const selectedRole = req.body.role === "provider" ? "provider" : "student";
+
+    if (!user) {
+      user = await User.create({
+        name,
+        email: email.toLowerCase().trim(),
+        googleId: sub,
+        avatar: picture || "",
+        role: selectedRole,
+      });
+
+      if (selectedRole === "provider") {
+        await Provider.create({
+          user: user._id,
+          kitchenName: `${name}'s Kitchen`,
+          location: "Near Hostel Road",
+          latitude: null,
+          longitude: null,
+          vegOnly: false,
+          isVerified: true,
+          isActive: true,
+          phone: "",
+          whatsapp: "",
+        });
+      }
+    } else {
+      // Link existing account to Google
+      if (!user.googleId) {
+        user.googleId = sub;
+
+        if (!user.avatar && picture) {
+          user.avatar = picture;
+        }
+
+        await user.save();
+      }
+    }
+
+    const token = jwt.sign(
+      {
+        id: user._id.toString(),
+        role: user.role,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      },
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        role: user.role,
+        avatar: user.avatar || "",
+      },
+    });
+  } catch (err) {
+    console.error("google login:", err);
+
+    return res.status(500).json({
+      message: "Google login failed",
+    });
+  }
+};
+
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("name email role address");
+    const user = await User.findById(req.user.id).select(
+      "name email role address",
+    );
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -249,10 +353,9 @@ exports.forgotPassword = async (req, res) => {
       expiresAt: expiry.toISOString(),
     });
 
-    const frontendBase = (process.env.FRONTEND_URL || "http://localhost:5173").replace(
-      /\/$/,
-      "",
-    );
+    const frontendBase = (
+      process.env.FRONTEND_URL || "http://localhost:5173"
+    ).replace(/\/$/, "");
     const resetLink = `${frontendBase}/reset-password/${rawToken}`;
 
     logForgotPassword(requestId, "reset link generated", {
