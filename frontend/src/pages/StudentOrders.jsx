@@ -176,11 +176,29 @@ export default function StudentOrders() {
                   key={order.order_id}
                   className="group relative flex flex-col rounded-xl border border-stone-200/90 bg-white/95 p-6 shadow-card transition duration-300 hover:-translate-y-1 hover:border-brand-orange/25 hover:shadow-card-hover"
                 >
-                  <div className="absolute right-4 top-4 text-xs font-medium text-stone-400">
-                    #{String(order.order_id).slice(-8)}
+                  <div className="absolute right-4 top-4 flex flex-col items-end gap-1.5">
+                    {order.menu_image ? (
+                      <img
+                        src={order.menu_image}
+                        alt={order.items || "Meal"}
+                        style={{
+                          width: 80,
+                          height: 80,
+                          objectFit: "cover",
+                          borderRadius: 10,
+                          flexShrink: 0,
+                          boxShadow: "0 2px 10px rgba(0,0,0,0.10)",
+                          border: "2px solid #f0e0d4",
+                          display: "block",
+                        }}
+                      />
+                    ) : null}
+                    <span className="text-xs font-medium text-stone-400">
+                      #{String(order.order_id).slice(-8)}
+                    </span>
                   </div>
 
-                  <h2 className="pr-16 text-lg font-bold leading-snug text-stone-900">
+                  <h2 className="pr-24 text-lg font-bold leading-snug text-stone-900">
                     {order.items ?? "Meal"}
                   </h2>
 

@@ -59,7 +59,7 @@ exports.getStudentOrders = async (req, res) => {
   try {
     const orders = await Order.find({ student: studentId })
       .sort({ createdAt: -1 })
-      .populate("menu", "items price")
+      .populate("menu", "items price image")
       .populate({
         path: "provider",
         select: "user",
@@ -82,6 +82,7 @@ exports.getStudentOrders = async (req, res) => {
       order_date: o.order_date,
       items: o.menu?.items,
       price: o.menu?.price,
+      menu_image: o.menu?.image || null,
       provider_name: o.provider?.user?.name,
       reviewed: reviewedSet.has(o._id.toString()),
     }));
