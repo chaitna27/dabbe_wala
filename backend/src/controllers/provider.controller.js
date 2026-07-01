@@ -140,9 +140,7 @@ exports.getPublicProviders = async (req, res) => {
 
 exports.getProviderDashboard = async (req, res) => {
   try {
-    console.log("req.user:", req.user);
     const provider = await ensureProviderForUser(req.user.id);
-    console.log("Provider found:", provider?._id?.toString(), provider?.kitchenName);
     if (!provider) {
       return res.status(404).json({ message: "Provider not found" });
     }
@@ -219,9 +217,7 @@ exports.reactivateProvider = async (req, res) => {
 
 exports.getProviderProfile = async (req, res) => {
   try {
-    console.log("req.user:", req.user);
     const provider = await ensureProviderForUser(req.user.id);
-    console.log("Provider found:", provider?._id?.toString(), provider?.kitchenName);
     if (!provider) {
       return res.status(404).json({ message: "Provider not found" });
     }
@@ -252,9 +248,7 @@ async function saveProviderProfile(req, res) {
   } = req.body;
 
   try {
-    console.log("req.user:", req.user);
     const provider = await ensureProviderForUser(req.user.id);
-    console.log("Provider found:", provider?._id?.toString(), provider?.kitchenName);
     if (!provider) {
       return res.status(404).json({ message: "Provider not found" });
     }

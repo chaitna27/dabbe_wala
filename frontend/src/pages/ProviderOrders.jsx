@@ -6,10 +6,7 @@ export default function ProviderOrders() {
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
 
-  if (!token || role !== "provider") {
-    return <Navigate to="/login" />;
-  }
-
+  // ── All hooks MUST be declared before any conditional return ──
   const [orders, setOrders] = useState([]);
 
   const fetchOrders = async () => {
@@ -24,6 +21,11 @@ export default function ProviderOrders() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  // ── Auth guard after hooks ──
+  if (!token || role !== "provider") {
+    return <Navigate to="/login" />;
+  }
 
   const updateStatus = async (orderId, status) => {
     try {
@@ -120,5 +122,3 @@ export default function ProviderOrders() {
     </div>
   );
 }
-
-

@@ -14,17 +14,6 @@
   --border-radius: 12px;
 }
 
-.navbar {
-  position: sticky;
-  top: 0;
-  display: flex;
-  justify-content: space-between;
-  padding: 1rem 5%;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px); /* This creates the glass effect */
-  border-bottom: 1px solid #eee;
-  z-index: 1000;
-}
 
 .provider-card {
   background: var(--white);

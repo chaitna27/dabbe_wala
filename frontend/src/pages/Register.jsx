@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api";
 import Input from "../components/Input";
 import "../styles/Auth.css";
@@ -6,11 +7,13 @@ import { GoogleLogin } from "@react-oauth/google";
 import { Eye, EyeOff } from "lucide-react";
 
 function Register() {
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("student");
   const [showPassword, setShowPassword] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -21,7 +24,8 @@ function Register() {
         password,
         role,
       });
-      alert("Registered successfully");
+      setSuccess(true);
+      setTimeout(() => navigate("/login"), 2000);
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.message || "Registration failed");
@@ -57,7 +61,25 @@ function Register() {
           Get wholesome tiffins delivered to your doorstep
         </p>
 
-        <form className="auth-form" onSubmit={handleRegister}>
+        {success && (
+          <div style={{
+            background: "#e8f5e9",
+            border: "1px solid #a5d6a7",
+            borderRadius: 10,
+            padding: "12px 16px",
+            marginBottom: 16,
+            textAlign: "center",
+          }}>
+            <p style={{ margin: 0, fontWeight: 700, color: "#1b5e20", fontSize: "1rem" }}>
+              ✅ Account created!
+            </p>
+            <p style={{ margin: "4px 0 0", fontSize: "0.87rem", color: "#2e7d32" }}>
+              Redirecting you to login…
+            </p>
+          </div>
+        )}
+
+        <form className="auth-form" onSubmit={handleRegister} style={{ opacity: success ? 0.5 : 1, pointerEvents: success ? "none" : "auto" }}>
           <div className="input-group">
             <label>Full Name</label>
             <Input

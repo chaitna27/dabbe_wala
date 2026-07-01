@@ -102,7 +102,7 @@ export default function ResetPassword() {
         </form>
 
         {message ? <p className="auth-success">{message}</p> : null}
-        <p className="auth-muted">Redirecting to login after success…</p>
+        {message ? <p className="auth-muted">Redirecting to login after success…</p> : null}
 
         <p className="auth-footer">
           <Link to="/login">Back to login</Link>

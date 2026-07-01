@@ -1,11 +1,13 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 import Landing from "./pages/Landing";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import NotFound from "./pages/NotFound";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import StudentOrders from "./pages/StudentOrders";
@@ -22,103 +24,107 @@ import CreateOrder from "./pages/CreateOrder";
 function App() {
   return (
     <BrowserRouter>
-      <Navbar />
+      <ErrorBoundary>
+        <Navbar />
 
-      <Routes>
-        <Route path="/" element={<Landing />} />
+        <Routes>
+          <Route path="/" element={<Landing />} />
 
-        {/* AUTH */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password/:token" element={<ResetPassword />} />
+          {/* AUTH */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-        {/* STUDENT */}
-        <Route
-          path="/student/find-meals"
-          element={
-            <ProtectedRoute allowedRoles={["student"]}>
-              <StudentProviders />
-            </ProtectedRoute>
-          }
-        />
+          {/* STUDENT */}
+          <Route
+            path="/student/find-meals"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentProviders />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/student/find-meals/:providerId"
-          element={
-            <ProtectedRoute allowedRoles={["student"]}>
-              <StudentFindMeals />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/student/find-meals/:providerId"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentFindMeals />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/student/orders"
-          element={
-            <ProtectedRoute allowedRoles={["student"]}>
-              <StudentOrders />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/student/orders"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentOrders />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/student/subscriptions"
-          element={
-            <ProtectedRoute allowedRoles={["student"]}>
-              <StudentSubscriptions />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/student/subscriptions"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentSubscriptions />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/create-order"
-          element={
-            <ProtectedRoute allowedRoles={["student"]}>
-              <CreateOrder />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/create-order"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <CreateOrder />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* PROVIDER */}
-        <Route
-          path="/provider/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={["provider"]}>
-              <ProviderDashboard />
-            </ProtectedRoute>
-          }
-        />
+          {/* PROVIDER */}
+          <Route
+            path="/provider/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["provider"]}>
+                <ProviderDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/provider/orders"
-          element={
-            <ProtectedRoute allowedRoles={["provider"]}>
-              <ProviderOrders />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/provider/orders"
+            element={
+              <ProtectedRoute allowedRoles={["provider"]}>
+                <ProviderOrders />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/provider/menu"
-          element={
-            <ProtectedRoute allowedRoles={["provider"]}>
-              <ProviderMenu />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/provider/menu"
+            element={
+              <ProtectedRoute allowedRoles={["provider"]}>
+                <ProviderMenu />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/provider/subscriptions"
-          element={
-            <ProtectedRoute allowedRoles={["provider"]}>
-              <ProviderSubscriptions />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
+          <Route
+            path="/provider/subscriptions"
+            element={
+              <ProtectedRoute allowedRoles={["provider"]}>
+                <ProviderSubscriptions />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 404 — must be last */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }
 
 export default App;
-

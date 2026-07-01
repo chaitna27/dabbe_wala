@@ -45,7 +45,6 @@ exports.getMenus = async (req, res) => {
 };
 
 exports.createMenu = async (req, res) => {
-  console.log("req.user:", req.user);
   const userId = req.user.id;
   const { items, price, day, meal_type, mealType, is_veg, isVeg } = req.body;
   const image = req.file?.path || null;
@@ -95,7 +94,6 @@ exports.createMenu = async (req, res) => {
 };
 
 exports.getProviderMenus = async (req, res) => {
-  console.log("req.user:", req.user);
   const userId = req.user.id;
 
   try {
